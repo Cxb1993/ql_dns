@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A241D88B19A3907B00E901AB /* solution.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2ED96651998288A00247E17 /* solution.cpp */; };
 		A2ED9658199822FF00247E17 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2ED9657199822FF00247E17 /* main.cpp */; };
 		A2ED965A199822FF00247E17 /* QL_DNS.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = A2ED9659199822FF00247E17 /* QL_DNS.1 */; };
 /* End PBXBuildFile section */
@@ -28,6 +29,12 @@
 		A2ED9654199822FF00247E17 /* QL_DNS */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = QL_DNS; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2ED9657199822FF00247E17 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		A2ED9659199822FF00247E17 /* QL_DNS.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = QL_DNS.1; sourceTree = "<group>"; };
+		A2ED96601998239200247E17 /* General_Definitions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = General_Definitions.h; sourceTree = "<group>"; };
+		A2ED96611998259E00247E17 /* Models */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Models; sourceTree = "<group>"; };
+		A2ED9662199825B700247E17 /* Auxiliary */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Auxiliary; sourceTree = "<group>"; };
+		A2ED9663199825B700247E17 /* Integrators */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Integrators; sourceTree = "<group>"; };
+		A2ED96651998288A00247E17 /* solution.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = solution.cpp; sourceTree = "<group>"; };
+		A2ED96661998288A00247E17 /* solution.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = solution.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -61,6 +68,12 @@
 			isa = PBXGroup;
 			children = (
 				A2ED9657199822FF00247E17 /* main.cpp */,
+				A2ED96601998239200247E17 /* General_Definitions.h */,
+				A2ED96651998288A00247E17 /* solution.cpp */,
+				A2ED96661998288A00247E17 /* solution.h */,
+				A2ED9662199825B700247E17 /* Auxiliary */,
+				A2ED9663199825B700247E17 /* Integrators */,
+				A2ED96611998259E00247E17 /* Models */,
 				A2ED9659199822FF00247E17 /* QL_DNS.1 */,
 			);
 			path = QL_DNS;
@@ -117,6 +130,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A241D88B19A3907B00E901AB /* solution.cpp in Sources */,
 				A2ED9658199822FF00247E17 /* main.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -227,6 +241,7 @@
 				A2ED965F199822FF00247E17 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
