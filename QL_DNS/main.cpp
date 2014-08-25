@@ -7,43 +7,76 @@
 //
 
 #include "General_Definitions.h"
-//#include "solution.h"
 // Models
-#include "Models/Test.h"
+#include "Models/ConstantDamping.h"
 // Integrators
 #include "Integrators/Euler.h"
+#include "Integrators/EulerCN.h"
+// Auxiliary
+#include "Auxiliary/MPIdata.h"
+#include "Auxiliary/Input_parameters.h"
 
 
-int main(int argc, const char * argv[])
+int main(int argc, char ** argv)
 {
-    double dt = 0.01;
-    double tfinal = 10.0;
-    double t = 0;
-    int nz = 16;
-    int nxy[2] = {2,2};
+    MPIdata mpi; // Storage of MPI data
+#ifdef USE_MPI_FLAG
+    MPI_Init(&argc,&argv);
+    MPI_Comm_size(MPI_COMM_WORLD, mpi.total_n_p());
+    MPI_Comm_rank(MPI_COMM_WORLD, mpi.my_n_p());
+    MPI_Comm_size(MPI_COMM_WORLD, mpi.comm_size_p());
+#endif
     
-    int nsteps = tfinal/dt;
+    
+    ////////////////////////////////////////////////////////////////
+    /////////                                           ////////////
+    /////////                INPUTS                     ////////////
+    std::string input_file_name;
+    if (argc == 2) {
+        input_file_name = argv[1]; // If an argument is passed, this specifies input file
+    } else {
+        input_file_name = "null";
+    }
+    Inputs SP( mpi , input_file_name);
+    /////////                                           ////////////
+    ////////////////////////////////////////////////////////////////
+
+    double t=SP.t_start ; // Initial time
+
     // Create a Model
-    Model* fluidEqs = new Test(nz,nxy,0.1);
+    fftwPlans fft;
+    Model* fluidEqs = new ConstantDamping(SP, mpi, fft);
     
-//    // Initialize solution
-//    solution sol( fluidEqs );
-//    
-//    // Initial condtions
-//    sol.Initial_Conditions();
-//    
-//    // Integrator
-//    Integrator *integrator;// = new Euler(t, dt, fluidEqs);
-//    
-//    // Main loop
-//    for (int i=0; i<nsteps; ++i) {
-//        integrator->Step(t, &sol);
-//        t += dt;
-//    }
-//    
+    // Initialize solution
+    solution *sol = new solution( fluidEqs );
+    
+    // Initial condtions
+    sol->Initial_Conditions();
+
+    
+    // Integrator
+    Integrator *integrator = new EulerCN(t, SP.dt, fluidEqs);
+    
+    // Main loop
+    for (int i = SP.i_start+1; i < SP.nsteps+1; i++) {
+        
+        std::stringstream out;
+        out << (*(sol->pLin(3))).transpose() << std::endl << (*(sol->pMF(0))).transpose() << std::endl;
+        mpi.print1(out.str());
+
+        
+        integrator->Step(t, sol);
+        t += SP.dt;
+        
+    }
+    
     
     delete fluidEqs;
-//    delete integrator;
+    delete sol;
+    delete integrator;
+#ifdef USE_MPI_FLAG
+    MPI_Finalize();
+#endif
     return 0;
 }
 

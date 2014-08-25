@@ -8,6 +8,13 @@
 
 /* Begin PBXBuildFile section */
 		A241D88B19A3907B00E901AB /* solution.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2ED96651998288A00247E17 /* solution.cpp */; };
+		A241D89019A391AE00E901AB /* ConstantDamping.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D88E19A391AE00E901AB /* ConstantDamping.cpp */; };
+		A241D89719A3928500E901AB /* Euler.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D89219A391C300E901AB /* Euler.cpp */; };
+		A241D89A19A3C6DD00E901AB /* MPIdata.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D89819A3C6DD00E901AB /* MPIdata.cpp */; };
+		A241D89F19A6375600E901AB /* EulerCN.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D89D19A6375600E901AB /* EulerCN.cpp */; };
+		A241D8A219A7922F00E901AB /* Kdata.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D8A019A7922F00E901AB /* Kdata.cpp */; };
+		A241D8A519A95CF800E901AB /* fftwPlans.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D8A319A95CF800E901AB /* fftwPlans.cpp */; };
+		A241D8A819A9629B00E901AB /* Input_parameters.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D8A619A9629B00E901AB /* Input_parameters.cpp */; };
 		A2ED9658199822FF00247E17 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2ED9657199822FF00247E17 /* main.cpp */; };
 		A2ED965A199822FF00247E17 /* QL_DNS.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = A2ED9659199822FF00247E17 /* QL_DNS.1 */; };
 /* End PBXBuildFile section */
@@ -26,13 +33,29 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A241D88D19A391AE00E901AB /* Model.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Model.h; sourceTree = "<group>"; };
+		A241D88E19A391AE00E901AB /* ConstantDamping.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ConstantDamping.cpp; sourceTree = "<group>"; };
+		A241D88F19A391AE00E901AB /* ConstantDamping.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ConstantDamping.h; sourceTree = "<group>"; };
+		A241D89219A391C300E901AB /* Euler.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Euler.cpp; sourceTree = "<group>"; };
+		A241D89319A391C300E901AB /* Euler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Euler.h; sourceTree = "<group>"; };
+		A241D89419A391C300E901AB /* Integrator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Integrator.h; sourceTree = "<group>"; };
+		A241D89819A3C6DD00E901AB /* MPIdata.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MPIdata.cpp; sourceTree = "<group>"; };
+		A241D89919A3C6DD00E901AB /* MPIdata.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MPIdata.h; sourceTree = "<group>"; };
+		A241D89C19A3CA2F00E901AB /* QL_DNS.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = QL_DNS.xcconfig; sourceTree = "<group>"; };
+		A241D89D19A6375600E901AB /* EulerCN.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = EulerCN.cpp; sourceTree = "<group>"; };
+		A241D89E19A6375600E901AB /* EulerCN.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = EulerCN.h; sourceTree = "<group>"; };
+		A241D8A019A7922F00E901AB /* Kdata.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Kdata.cpp; sourceTree = "<group>"; };
+		A241D8A119A7922F00E901AB /* Kdata.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Kdata.h; sourceTree = "<group>"; };
+		A241D8A319A95CF800E901AB /* fftwPlans.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = fftwPlans.cpp; sourceTree = "<group>"; };
+		A241D8A419A95CF800E901AB /* fftwPlans.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fftwPlans.h; sourceTree = "<group>"; };
+		A241D8A619A9629B00E901AB /* Input_parameters.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Input_parameters.cpp; sourceTree = "<group>"; };
+		A241D8A719A9629B00E901AB /* Input_parameters.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Input_parameters.h; sourceTree = "<group>"; };
+		A241D8A919A9632100E901AB /* SW_test.DSSinput */ = {isa = PBXFileReference; lastKnownFileType = text; path = SW_test.DSSinput; sourceTree = "<group>"; };
+		A241D8AB19A9757600E901AB /* SConstruct */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = SConstruct; sourceTree = "<group>"; };
 		A2ED9654199822FF00247E17 /* QL_DNS */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = QL_DNS; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2ED9657199822FF00247E17 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		A2ED9659199822FF00247E17 /* QL_DNS.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = QL_DNS.1; sourceTree = "<group>"; };
 		A2ED96601998239200247E17 /* General_Definitions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = General_Definitions.h; sourceTree = "<group>"; };
-		A2ED96611998259E00247E17 /* Models */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Models; sourceTree = "<group>"; };
-		A2ED9662199825B700247E17 /* Auxiliary */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Auxiliary; sourceTree = "<group>"; };
-		A2ED9663199825B700247E17 /* Integrators */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Integrators; sourceTree = "<group>"; };
 		A2ED96651998288A00247E17 /* solution.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = solution.cpp; sourceTree = "<group>"; };
 		A2ED96661998288A00247E17 /* solution.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = solution.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -48,9 +71,48 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		A241D88C19A391AE00E901AB /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				A241D88D19A391AE00E901AB /* Model.h */,
+				A241D88E19A391AE00E901AB /* ConstantDamping.cpp */,
+				A241D88F19A391AE00E901AB /* ConstantDamping.h */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		A241D89119A391C300E901AB /* Integrators */ = {
+			isa = PBXGroup;
+			children = (
+				A241D89D19A6375600E901AB /* EulerCN.cpp */,
+				A241D89E19A6375600E901AB /* EulerCN.h */,
+				A241D89219A391C300E901AB /* Euler.cpp */,
+				A241D89319A391C300E901AB /* Euler.h */,
+				A241D89419A391C300E901AB /* Integrator.h */,
+			);
+			path = Integrators;
+			sourceTree = "<group>";
+		};
+		A241D89619A391E000E901AB /* Auxiliary */ = {
+			isa = PBXGroup;
+			children = (
+				A241D89819A3C6DD00E901AB /* MPIdata.cpp */,
+				A241D89919A3C6DD00E901AB /* MPIdata.h */,
+				A241D8A019A7922F00E901AB /* Kdata.cpp */,
+				A241D8A119A7922F00E901AB /* Kdata.h */,
+				A241D8A319A95CF800E901AB /* fftwPlans.cpp */,
+				A241D8A419A95CF800E901AB /* fftwPlans.h */,
+				A241D8A619A9629B00E901AB /* Input_parameters.cpp */,
+				A241D8A719A9629B00E901AB /* Input_parameters.h */,
+			);
+			path = Auxiliary;
+			sourceTree = "<group>";
+		};
 		A2ED964B199822FF00247E17 = {
 			isa = PBXGroup;
 			children = (
+				A241D8AB19A9757600E901AB /* SConstruct */,
+				A241D89C19A3CA2F00E901AB /* QL_DNS.xcconfig */,
 				A2ED9656199822FF00247E17 /* QL_DNS */,
 				A2ED9655199822FF00247E17 /* Products */,
 			);
@@ -68,12 +130,13 @@
 			isa = PBXGroup;
 			children = (
 				A2ED9657199822FF00247E17 /* main.cpp */,
+				A241D8A919A9632100E901AB /* SW_test.DSSinput */,
 				A2ED96601998239200247E17 /* General_Definitions.h */,
 				A2ED96651998288A00247E17 /* solution.cpp */,
 				A2ED96661998288A00247E17 /* solution.h */,
-				A2ED9662199825B700247E17 /* Auxiliary */,
-				A2ED9663199825B700247E17 /* Integrators */,
-				A2ED96611998259E00247E17 /* Models */,
+				A241D89119A391C300E901AB /* Integrators */,
+				A241D88C19A391AE00E901AB /* Models */,
+				A241D89619A391E000E901AB /* Auxiliary */,
 				A2ED9659199822FF00247E17 /* QL_DNS.1 */,
 			);
 			path = QL_DNS;
@@ -130,8 +193,15 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A241D89A19A3C6DD00E901AB /* MPIdata.cpp in Sources */,
+				A241D8A219A7922F00E901AB /* Kdata.cpp in Sources */,
+				A241D8A819A9629B00E901AB /* Input_parameters.cpp in Sources */,
+				A241D89019A391AE00E901AB /* ConstantDamping.cpp in Sources */,
+				A241D89F19A6375600E901AB /* EulerCN.cpp in Sources */,
 				A241D88B19A3907B00E901AB /* solution.cpp in Sources */,
+				A241D8A519A95CF800E901AB /* fftwPlans.cpp in Sources */,
 				A2ED9658199822FF00247E17 /* main.cpp in Sources */,
+				A241D89719A3928500E901AB /* Euler.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -140,14 +210,16 @@
 /* Begin XCBuildConfiguration section */
 		A2ED965B199822FF00247E17 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A241D89C19A3CA2F00E901AB /* QL_DNS.xcconfig */;
 			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				ALWAYS_SEARCH_USER_PATHS = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++98";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_CXX0X_EXTENSIONS = YES;
 				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
 				CLANG_WARN_EMPTY_BODY = YES;
 				CLANG_WARN_ENUM_CONVERSION = YES;
@@ -170,22 +242,34 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include,
+					/usr/local/include,
+				);
+				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				MACOSX_DEPLOYMENT_TARGET = 10.9;
 				ONLY_ACTIVE_ARCH = YES;
+				OTHER_LDFLAGS = (
+					"-lm",
+					"-lfftw3",
+				);
 				SDKROOT = macosx;
 			};
 			name = Debug;
 		};
 		A2ED965C199822FF00247E17 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A241D89C19A3CA2F00E901AB /* QL_DNS.xcconfig */;
 			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				ALWAYS_SEARCH_USER_PATHS = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++98";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_CXX0X_EXTENSIONS = YES;
 				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
 				CLANG_WARN_EMPTY_BODY = YES;
 				CLANG_WARN_ENUM_CONVERSION = YES;
@@ -203,21 +287,69 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include,
+					/usr/local/include,
+				);
+				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				MACOSX_DEPLOYMENT_TARGET = 10.9;
+				OTHER_LDFLAGS = (
+					"-lm",
+					"-lfftw3",
+				);
 				SDKROOT = macosx;
 			};
 			name = Release;
 		};
 		A2ED965E199822FF00247E17 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A241D89C19A3CA2F00E901AB /* QL_DNS.xcconfig */;
 			buildSettings = {
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include,
+					/usr/local/include,
+					/usr/local/hdf5/include,
+				);
+				LIBRARY_SEARCH_PATHS = (
+					/usr/local/lib,
+					/usr/local/hdf5/lib,
+				);
+				OTHER_LDFLAGS = (
+					"-lfftw3",
+					/usr/local/hdf5/lib/libhdf5_hl.a,
+					/usr/local/hdf5/lib/libhdf5.a,
+					"-lz",
+					"-ldl",
+					"-lm",
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
 		};
 		A2ED965F199822FF00247E17 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A241D89C19A3CA2F00E901AB /* QL_DNS.xcconfig */;
 			buildSettings = {
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include,
+					/usr/local/include,
+					/usr/local/hdf5/include,
+				);
+				LIBRARY_SEARCH_PATHS = (
+					/usr/local/lib,
+					/usr/local/hdf5/lib,
+				);
+				OTHER_LDFLAGS = (
+					"-lfftw3",
+					/usr/local/hdf5/lib/libhdf5_hl.a,
+					/usr/local/hdf5/lib/libhdf5.a,
+					"-lz",
+					"-ldl",
+					"-lm",
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;

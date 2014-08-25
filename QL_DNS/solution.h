@@ -17,24 +17,36 @@
 #include "General_Definitions.h"
 #include "Models/Model.h"
 
+
 class solution{
 public:
     // Constructor - takes a model
     solution(Model* eqs);
     ~solution();
     
+    ////  REQUIRED METHODS  -  pLin, pMF
     // Pointers to parts of solutions
-    dcmplxVec* pLin(int i){return linear_field_+i;};
+    dcmplxVec* pLin(int i) const {return linear_field_+i;}; //  Fluctuation variables
+    dcmplxVec* pMF(int i) const {return mean_field_+i;}; //  Fluctuation variables
     
-    // Initial condition
+    // Initial conditions
     void Initial_Conditions();
     
+    
 private:
-    // Sizes
-    int nz_, dimxy_;
+    // Sizes - nz, nxy (dimension in x,y on each processor), nMF (number of mean fields), nLin (number of linear fields)
+    const int nz_, nxy_, nMF_, nLin_;
     // Data storage
-    dcmplxVec* linear_field_;
+    dcmplxVec *linear_field_;// Fluctuations
+    dcmplxVec *mean_field_; // Mean fields
+    
     
 };
 
+
 #endif /* defined(__QL_DNS__solution__) */
+
+
+
+
+

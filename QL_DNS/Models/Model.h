@@ -10,18 +10,19 @@
 #define QL_DNS_Model_h
 
 #include "../General_Definitions.h"
-//#include "../Auxiliary/MPIdata.h"
+#include "../Auxiliary/MPIdata.h"
 //#include "../Auxiliary/TimeVariables.h"
 
 // Abstract model class - container for equations of motion for QL_DNS
 // Solution is stored in "solution" class
 
-//class solution;
+class solution;
+class Kdata;
 
 class Model {
 public:
     
-    Model(int NZ,const int NXY[2]) //: ,const double * L) : L_(L)
+    Model(int NZ,const int NXY[2],const double * L) : L_(L)
     {
         // These dimensions do not depend on model (i.e., number of variables, MFs etc.)
         NZ_ = NZ;
@@ -34,29 +35,43 @@ public:
     
     
     // fx = f(x,t)
-    // Returns nonlinear part of of RHS and a linear operator (linop_Ckl, linop_MF), so
+    // Returns nonlinear part of of RHS and a linear operator (linop_Ckl), so
     //  as to allow for semi-implicit integrators.
     // The linear operators are evaluated at t + dt_lin
     virtual void rhs(const double t, const double dt_lin,
-                    const dcmplxVec * SolIn,dcmplxVec * SolOut) = 0;
+                    const solution * SolIn,solution * SolOut, doubVec *linOpFluct) = 0;
     
-//    // Initialization of linear operators - for mean fields linop is constant anyway
-//    virtual void linearOPs_Init(double t0, doubVec * linop_MF, doubVec * linop_Ckl_old) = 0;
+    // Initialization of linear operators - for mean fields linop is constant anyway
+    virtual void linearOPs_Init(double t0, doubVec *linOpFluct, doubVec *linOpMF) = 0;
     
     // number of states (size of x)
     int Dimxy_full() const {return nxy_full_;}; // Full C size in x,y
     int NZ() const {return NZ_;};  // Size of MF vectors in z
     virtual int Dimxy() const = 0; // Size of C array on given MPI process
     virtual int num_MFs() const = 0;  // Number of mean fields
-//    // Box size
-//    virtual double box_length(int index) const =0; // Size of box
-//    
+    virtual int num_Lin() const =0; // Number of linear (fluctuating) fields
+    // Box size
+    double L(int ind) const { return L_[ind]; }; // Size of box
+    int N(int ind) const { // Convenient to have full dimensions available
+        if (ind==0){
+            return Nxy_[0];
+        } else if (ind==1){
+            return Nxy_[1]*2; // Full y dimension in real space!
+        } else if (ind==2){
+            return NZ_;
+        }
+        return 0;
+    };
+//
 //    // MPI related
 //    virtual int index_for_k_array() const =0;
 //    
 //    // Return kx - necessary for remapping
 //    dcmplx* kx_pointer() const {return kx_;};
 //    dcmplx* ky_pointer() const {return ky_;};
+    
+    // Store k vectors as public member, only very rarely need to be accessed from outside model sub-class (for saving and restarting)
+    Kdata *K;
 //    
 //    // Remapping procedure
 //    friend void ShearingBox_Remap(Model* model,dcmplxMat* Ckl);
@@ -77,12 +92,7 @@ protected:
     int Nxy_[2];           // Dimensions (Nx, Ny/2)
     int NZ_;
     int nxy_full_;      // Ckl Nxy[0]*Nxy[1] total dimension
-//    const double * L_;       // Box size (Lx,Ly,Lz)
-    
-//    // K VECTORS DATA
-//    dcmplx *kx_,*ky_;
-//    dcmplxVec kz_;
-//    doubVec kz2_; // kz^2
+    const double * L_;       // Box size (Lx,Ly,Lz)
     
 };
 

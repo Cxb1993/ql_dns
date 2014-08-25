@@ -1,0 +1,34 @@
+Input file for MRIDSS - Generated automatically by WriteMRIDSSinput.m
+
+Format: variable_ = var (can have arbitrary number of spaces around = )
+
+// Simulation type - used as a check
+equations_to_use_ = MHD_FullUBQlin 
+// Box parameters
+lx_ = 1.000000000000000, ly_ = 1.0, lz_ = 1.000000000000000
+nx_ = 4,  ny_ = 16,  nz_ = 8
+
+// Time parameters
+dt_ = 0.0500000000000000
+t_initial_ = 0.000000000000000,   t_final_ = 1.000000000000000,
+
+// Saving
+tv_save_ = 0.100000000000000,   // Save energy, momentum etc. time-step
+full_save_ = 301.000000000000000,   // Save full solution
+save_energy? =1  save_angular_mom? =1     save_dissipation?=1, // On-off flags
+save_reynolds_stress?= 1 
+mean_field_save? = 1  // Save mean fields
+
+// General physical parameters
+q_ = 1.500000000000000 
+nu_ = 0.00400000,  eta_ = 0.004000,   // Dissipation parameters
+f_noise_ = 0.000000000000000
+
+// Initial conditions
+initial_By_ = 0.1000000000000
+// Flags for simulation
+Remap? = 1
+QuasiLinear? = 1
+
+// Restart simulation
+start_from_saved? = 0 

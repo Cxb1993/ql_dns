@@ -14,7 +14,7 @@
 /////              MPI FLAG               ////////
 // This is better as a preprocessor directive since it lets you debug in serial more easily
 
-// #define USE_MPI_FLAG
+#define USE_MPI_FLAG
 
 //////////////////////////////////////////////////
 
@@ -42,7 +42,9 @@
 #ifdef USE_MPI_FLAG
     #include <mpi.h>
 #endif
-// #include <fftw3.h>
+#include <hdf5.h>
+#include "hdf5_hl.h"
+#include <fftw3.h>
 // #define EIGEN_NO_DEBUG  // Define to turn off eigen range checking
 #include "../Eigen/Dense"
 #include "../External_headers/tinydir.h"

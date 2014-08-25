@@ -20,7 +20,7 @@ class solution;
 class Integrator {
 public:
     virtual ~Integrator() {};
-    virtual int Step(double t, solution * sol) = 0;
+    virtual void Step(double t, solution * sol) = 0;
     // Reinitialize linear operators (these are stored in integrator)
 //    virtual void Reinitialize_linear_Ops(double t) = 0;
 };
