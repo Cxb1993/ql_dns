@@ -15,6 +15,7 @@
 		A241D8A219A7922F00E901AB /* Kdata.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D8A019A7922F00E901AB /* Kdata.cpp */; };
 		A241D8A519A95CF800E901AB /* fftwPlans.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D8A319A95CF800E901AB /* fftwPlans.cpp */; };
 		A241D8A819A9629B00E901AB /* Input_parameters.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D8A619A9629B00E901AB /* Input_parameters.cpp */; };
+		A241D8B019ABDA3F00E901AB /* TimeVariables.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D8AE19ABDA3F00E901AB /* TimeVariables.cpp */; };
 		A2ED9658199822FF00247E17 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2ED9657199822FF00247E17 /* main.cpp */; };
 		A2ED965A199822FF00247E17 /* QL_DNS.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = A2ED9659199822FF00247E17 /* QL_DNS.1 */; };
 /* End PBXBuildFile section */
@@ -52,6 +53,8 @@
 		A241D8A719A9629B00E901AB /* Input_parameters.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Input_parameters.h; sourceTree = "<group>"; };
 		A241D8A919A9632100E901AB /* SW_test.DSSinput */ = {isa = PBXFileReference; lastKnownFileType = text; path = SW_test.DSSinput; sourceTree = "<group>"; };
 		A241D8AB19A9757600E901AB /* SConstruct */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = SConstruct; sourceTree = "<group>"; };
+		A241D8AE19ABDA3F00E901AB /* TimeVariables.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = TimeVariables.cpp; sourceTree = "<group>"; };
+		A241D8AF19ABDA3F00E901AB /* TimeVariables.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TimeVariables.h; sourceTree = "<group>"; };
 		A2ED9654199822FF00247E17 /* QL_DNS */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = QL_DNS; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2ED9657199822FF00247E17 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		A2ED9659199822FF00247E17 /* QL_DNS.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = QL_DNS.1; sourceTree = "<group>"; };
@@ -104,6 +107,8 @@
 				A241D8A419A95CF800E901AB /* fftwPlans.h */,
 				A241D8A619A9629B00E901AB /* Input_parameters.cpp */,
 				A241D8A719A9629B00E901AB /* Input_parameters.h */,
+				A241D8AE19ABDA3F00E901AB /* TimeVariables.cpp */,
+				A241D8AF19ABDA3F00E901AB /* TimeVariables.h */,
 			);
 			path = Auxiliary;
 			sourceTree = "<group>";
@@ -195,6 +200,7 @@
 			files = (
 				A241D89A19A3C6DD00E901AB /* MPIdata.cpp in Sources */,
 				A241D8A219A7922F00E901AB /* Kdata.cpp in Sources */,
+				A241D8B019ABDA3F00E901AB /* TimeVariables.cpp in Sources */,
 				A241D8A819A9629B00E901AB /* Input_parameters.cpp in Sources */,
 				A241D89019A391AE00E901AB /* ConstantDamping.cpp in Sources */,
 				A241D89F19A6375600E901AB /* EulerCN.cpp in Sources */,
