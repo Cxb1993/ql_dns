@@ -48,6 +48,14 @@ public:
     void SumReduce_IP_doub(double* in_p, int size);// Sum double values
     void SumAllReduce_IP_double(double* in_p, int size); //Sum double, in place
     void SumAllReduce_double(double* in_p, double*out_p, int size);//Sum double,
+    
+    // Send and receive for noise
+    void Send_dcmplx(dcmplx* s_buff, int count, int dest, int tag);
+    void Recv_dcmplx(dcmplx* r_buff, int count, int source, int tag);
+    // Pass all of an array to node 0
+    void PassToNode0_float(float *in_p, float *rec_p, int size_init);
+    // Scatter data from node 0
+    void ScatterFromNode0_float(float *in_p, float *rec_p, int size_rec_p);
 private:
     
     // General MPI data

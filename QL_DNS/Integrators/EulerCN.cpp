@@ -9,22 +9,31 @@
 #include "EulerCN.h"
 
 
-EulerCN::EulerCN(double t0, double dt, Model * mod) :
-dt_(dt), nxy_(mod->Dimxy()), nz_(mod->NZ()),
+EulerCN::EulerCN(double t0, Inputs& SP, Model * mod) :
+nxy_(mod->Dimxy()), nz_(mod->NZ()),
 nMF_(mod->num_MFs()),nLin_(mod->num_Lin()),
 model_(mod)
 {
+    if (SP.dt<0)
+        std::cout << "Variable time-step not supported by EulerCN integrator!"<< std::endl;
+    dt_ = SP.dt; // This integrator requires a time-step to be specified in inputs!!
+    
     // Solution RHS (dt U = F(U) ) as returned by integrator
     sol_rhs_ = new solution(model_);
     
     
     /////////////////////////////////////////////////////////////
     // Linear operators - couldn't think of a good way to do this, just doubVec array
-    linearOp_fluct_ = new doubVec[nxy_];
-    linearOp_fluct_old_ = new doubVec[nxy_];
+    
+    linearOp_fluct_ = new doubVec*[nxy_];
+    linearOp_fluct_old_ = new doubVec*[nxy_];
     for (int i=0; i<nxy_; ++i) {
-        linearOp_fluct_[i] = doubVec(nLin_*nz_);
-        linearOp_fluct_old_[i] = doubVec(nLin_*nz_);
+        linearOp_fluct_[i] = new doubVec[nLin_];
+        linearOp_fluct_old_[i] = new doubVec[nLin_];
+        for (int j=0; j<nLin_; ++j) {
+            linearOp_fluct_[i][j] = doubVec(nz_);
+            linearOp_fluct_old_[i][j] = doubVec(nz_);
+        }
     }
     denom = doubVec(nz_);
     
@@ -49,6 +58,10 @@ model_(mod)
 
 EulerCN::~EulerCN() {
     delete sol_rhs_;
+    for (int i=0; i<nxy_; ++i) {
+        delete[] linearOp_fluct_[i];
+        delete[] linearOp_fluct_old_[i];
+    }
     delete[] linearOp_fluct_;
     delete[] linearOp_fluct_old_;
     delete[] linearOp_MF_LinCo_;
@@ -60,18 +73,22 @@ EulerCN::~EulerCN() {
 ///////////////////////////////////////////
 //   STEP
 // Step forward in time
-void EulerCN::Step(double t, solution * sol){
+double EulerCN::Step(double t, solution * sol){
     
-    model_->rhs(t, 0, sol ,sol_rhs_, linearOp_fluct_);
+    model_->rhs(t, dt_, sol ,sol_rhs_, linearOp_fluct_);
     
     // Can't think of a nice way to isolate all the details of sol from the integrator for the more complicated semi-implicit versions - annoying!
     // Thus, this depends on the details of the solution class!
     
     // Linear fluctuations
     for (int i=0; i<nxy_; ++i) {
-        denom = 1/(1-dt_/2*linearOp_fluct_[i]);
-        // Probably faster to do inside Eigen for vectorization
-        (*(sol->pLin(i))) = dt_*denom*(*(sol_rhs_->pLin(i))) + (1+dt_/2*linearOp_fluct_old_[i])*denom*(*(sol->pLin(i)));
+        for (int j=0; j<nLin_; ++j){
+            denom = 1/(1-dt_/2*linearOp_fluct_[i][j]);
+            // Probably faster to do inside Eigen for vectorization
+            (*(sol->pLin(i,j))) = dt_*denom*(*(sol_rhs_->pLin(i,j))) + (1+dt_/2*linearOp_fluct_old_[i][j])*denom*(*(sol->pLin(i,j)));
+        }
+        
+        
     }
     
     // Mean fields
@@ -80,8 +97,13 @@ void EulerCN::Step(double t, solution * sol){
     }
     
     // Move variables around
-    for (int i=0; i<nxy_; i++)
-        linearOp_fluct_old_[i] = linearOp_fluct_[i];
+    for (int i=0; i<nxy_; i++){
+        for (int j=0; j<nLin_; ++j)
+            linearOp_fluct_old_[i][j] = linearOp_fluct_[i][j];
+    }
+    
+    return dt_;
+
     
     
 }

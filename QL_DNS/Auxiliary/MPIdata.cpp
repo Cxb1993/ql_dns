@@ -127,3 +127,53 @@ void MPIdata::SumAllReduce_double(double* in_p, double *out_p, int size) {
 #endif
 }
 
+// Basic MPI send - complex data
+void MPIdata::Send_dcmplx(dcmplx* s_buff, int count, int dest, int tag){
+#ifdef USE_MPI_FLAG
+    MPI_Send(s_buff, count, MPI_C_DOUBLE_COMPLEX, dest, tag, MPI_COMM_WORLD);
+#else
+    print1("SHOULD NOT BE CALLING Send_dcmplx WITHOUT MPI!!!\n");
+#endif
+}
+// Basic MPI receive - complex data
+void MPIdata::Recv_dcmplx(dcmplx* r_buff, int count, int source, int tag){
+#ifdef USE_MPI_FLAG
+    MPI_Recv(r_buff, count, MPI_C_DOUBLE_COMPLEX, source, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+#else
+    print1("SHOULD NOT BE CALLING Recv_dcmplx WITHOUT MPI!!!\n");
+#endif
+}
+
+
+
+// Passes data from in_p to rec_p on processor 0
+// rec_p must be of size np*size_init
+void MPIdata::PassToNode0_float(float *in_p, float *rec_p, int size_init){
+    // NB: This is essentially MPI_Gather, I hadn't realized and doesn't seem worth changing
+#ifdef USE_MPI_FLAG
+    for (int i=1; i<total_n_v(); ++i) {
+        if (my_n_v() == i)
+            MPI_Send(in_p, size_init, MPI_FLOAT, 0, 0, MPI_COMM_WORLD);
+        if (my_n_v() == 0)
+            MPI_Recv(rec_p+size_init*i, size_init, MPI_FLOAT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    }
+#endif
+    // Copy over size_init elements from in_p to rec_p, same if no mpi
+    if (my_n_v() == 0) {
+        for (int i=0; i<size_init; ++i) {
+            rec_p[i] = in_p[i];
+        }
+    }
+}
+
+// Scatters data from node 0 across all processes
+void MPIdata::ScatterFromNode0_float(float *in_p, float *rec_p, int size_rec_p){
+#ifdef USE_MPI_FLAG
+    MPI_Scatter(in_p, size_rec_p, MPI_FLOAT,rec_p, size_rec_p*total_n_v(), MPI_FLOAT, 0,MPI_COMM_WORLD);
+#else
+    // Copy in_p to rec_p
+    for (int i=0; i<size_on_all_proc; ++i) {
+        rec_p[i] = in_p[i];
+    }
+#endif
+}

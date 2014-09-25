@@ -1,13 +1,14 @@
 //
-//  ConstantDamping.h
+//  MHD_BQlin.h
 //  QL_DNS
 //
-//  Created by Jonathan Squire on 8/19/14.
+//  Created by Jonathan Squire on 9/16/14.
 //  Copyright (c) 2014 J Squire. All rights reserved.
 //
 
-#ifndef __QL_DNS__ConstantDamping__
-#define __QL_DNS__ConstantDamping__
+#ifndef __QL_DNS__MHD_BQlin__
+#define __QL_DNS__MHD_BQlin__
+
 
 #include "Model.h"
 #include "../solution.h"
@@ -17,13 +18,12 @@
 #include "../Auxiliary/Input_parameters.h"
 #include "../Auxiliary/MPIdata.h"
 
-// Very basic model class to use for ConstantDampinging things.
-// Uses standard linear MHD variables, but linear operator is just damping. Should reach equipartition of energy in all modes
-
-class ConstantDamping : public Model {
+// Basic MHD Quasi-linear class
+// Includes interaction of fluctuations with By and that's all
+class MHD_BQlin : public Model {
 public:
-    ConstantDamping(const Inputs& sp, MPIdata& mpi, fftwPlans& fft);
-    ~ConstantDamping();
+    MHD_BQlin(const Inputs& sp, MPIdata& mpi, fftwPlans& fft);
+    ~MHD_BQlin();
     
     // Equations
     void rhs(const double t, const double dt_lin,
@@ -43,11 +43,11 @@ public:
     //   DRIVING NOISE
     void DrivingNoise(double t, double dt, solution *sol);
     //////////////////////////////////////////////////////////
-
+    
     //////////////////////////////////////////////////////////
     //   Remapping
     void ShearingBox_Remap(double qt, solution *sol);
-
+    
     //////////////////////////////////////////////////////////////////
     //////  AUXILIARY FUNCTIONS OPERATING ON SOLUTION   //////////////
     void Calc_Energy_AM_Diss(TimeVariables& tv, double t, const solution* sol);
@@ -63,7 +63,7 @@ private:
     double f_noise_; // Driving noise
     const double q_; // q
     
-    double dampFac;
+    bool QL_YN_; // Flag for QL or not
     
     bool dont_drive_ky0_modes_;
     
@@ -76,7 +76,6 @@ private:
     // Useful array sizes
     long totalN2_;
     double mult_noise_fac_;
-    long    nz2_;
     
     // Assign laplacians - just for convenience
     void assign_laplacians_(int i,double t,bool need_inverse);
@@ -85,17 +84,28 @@ private:
     boost::random::mt19937 mt_;
     boost::random::normal_distribution<double> ndist_;
     dcmplxVec noise_buff_;
+    int noise_buff_len_; // Length of noise (no need to include dealiased bits)
     
+    // Reynolds stresses
+    dcmplxVec bzux_m_uzbx_c_,bzuy_m_uzby_c_;
+    doubVec bzux_m_uzbx_d_, bzuy_m_uzby_d_, reynolds_stress_MPI_send_, reynolds_stress_MPI_receive_;
     
     ////////////////////////////////////////////////////
     //               TEMPORARY VARIABLES              //
     doubVec lapFtmp_, lap2tmp_; // Laplacians - nice to still have lap2
     doubVec ilapFtmp_, ilap2tmp_; // Inverse Laplacians
     
+    // Temps for evaulation of main equations
+    dcmplxVec uy_,uz_,by_,bz_;
+    dcmplxVec tmp1_z_,tmp2_z_,tmp3_z_; // Temps after transform (size NZfull() )
+    dcmplxVec tmp1_k_,tmp2_k_,tmp3_k_; // Temps before transform (size NZ() )
+    
     dcmplx kxctmp_, kyctmp_;
     double kxtmp_,kytmp_;
     int ind_ky_;
-
+    
+    dcmplxVec By_,dzBy_,dzdzBy_; // Mean fields (real space)
+    
 };
 
-#endif /* defined(__QL_DNS__ConstantDamping__) */
+#endif /* defined(__QL_DNS__MHD_BQlin__) */

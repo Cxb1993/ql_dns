@@ -31,7 +31,7 @@
 #include <iomanip>
 #include <complex>
 #include <vector>
-//#include <random>
+#include <boost/random.hpp> // Faster than cpp standard!
 #include <ctime>
 #include <cmath>
 #include <sys/types.h>
@@ -77,11 +77,13 @@ typedef std::complex<double> dcmplx;
 // USE COLUMN_MAJOR FORMAT FOR MATRIX. THE ONLY PLACE WHERE THIS MIGHT CAUSE A PROBLEM IS IN FFTW, SO LONG AS I'M CAREFUL SHOULD BE EASY
 // Reason for this choice is to facilitate transformation over from Matlab
 typedef Eigen::Array<dcmplx, Eigen::Dynamic, 1> dcmplxVec;
+
 typedef Eigen::Array<double, Eigen::Dynamic, 1> doubVec;// For use in linear part
 
-// Saving Ckl
-typedef std::complex<float> Ckl_storage; // For saving Ckl (kept general for backwards compatibility)
-typedef Eigen::Matrix<Ckl_storage, Eigen::Dynamic, Eigen::Dynamic> Ckl_storage_mat;
+// For saving
+typedef std::complex<float> fcmplx;
+typedef Eigen::Array<fcmplx, Eigen::Dynamic, 1> fcmplxVec; // For saving solution (kept general for backwards compatibility)
+
 
 //////////////////////////////////////////////////
 
@@ -91,5 +93,9 @@ const double PI=atan(1)*4;
 const std::string CURR_BASE_DIR = "/Users/jsquire/Documents/QL_DNS/QL_DNS/";
 const std::string DATA_DIR = "/Users/jsquire/Documents/QL_DNS/QL_DNS/Data/";
 // Data directory is defined from root so that /p/... can be used on the cluster
+
+using namespace std; // FOR DEBUGGING (cout), DELETE LATER
+
+#define MAX_NAME 512 // For c style strings, max length of name
 
 #endif

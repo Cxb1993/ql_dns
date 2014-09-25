@@ -74,15 +74,13 @@ Inputs::Inputs(const MPIdata& mpi, const std::string& input_file_name): mpi_node
         
         // Time domain variables: dt, t_final, t_initial
         dt = Read_From_Input_File_<double>("dt_",fullfile,0.33333333333333);
+        CFL = Read_From_Input_File_<double>("CFL_",fullfile,1.0);
         t_final = Read_From_Input_File_<double>("t_final_",fullfile,10.0);
         t_initial = Read_From_Input_File_<double>("t_initial_",fullfile,0.0);
         // Saving: tv_save, full_save
         timvar_save_interval = Read_From_Input_File_<double>("tv_save_",fullfile,dt);
         fullsol_save_interval = Read_From_Input_File_<double>("full_save_",fullfile,0.0);
-        if (fullsol_save_interval<t_final && fullsol_save_interval != 0) {
-            mpi.print1("Warning: intermediate saves not yet supported!\nSetting fullsol_save_interval to t_final\n");
-            fullsol_save_interval = t_final + 1;
-        }
+        
         
         // Other physical parameters: nu, eta, q, f_noise
         nu = Read_From_Input_File_<double>("nu_",fullfile,0.01);
@@ -112,6 +110,7 @@ Inputs::Inputs(const MPIdata& mpi, const std::string& input_file_name): mpi_node
         // This is loaded after other initialization, with t_final taken from input
         
         
+        
         // Check that equations are the same as that specified in main
         equations_to_use = Read_From_Input_File_<std::string>("equations_to_use_",fullfile,"MHD_BQlin");// Set default so backwards compatible
         
@@ -133,20 +132,17 @@ void Inputs::initialize_() {
     t_start = t_initial;
     i_start = 0;
     timevar_save_nsteps = round(timvar_save_interval/dt);
+    fullsol_save_Q = 1;
+    if (fullsol_save_interval>t_final-t_initial) {// Does one final save for any large fullsol_save_interval
+        fullsol_save_interval = t_final-t_initial;
+    } else if (fullsol_save_interval == 0){
+        fullsol_save_interval = t_final-t_initial+1e6; // Don't save at all
+        fullsol_save_Q = 0;
+    }
     fullsol_save_nsteps = round(fullsol_save_interval/dt);
     
-    // Shearing box - THIS ISN'T USED WITH NEW REMAP METHOD
-    num_before_remap = 2*nsteps; // If no remap
-    //    if (remapQ) {
-    //        TSB = L[1]/L[0]/q;
-    //        // Test for an integer number of steps
-    //        if (fabs(TSB/dt-round(TSB/dt)) > 1e-10) {
-    //            if (mpi_node_== 0){
-    //                std::cout << "Warning, non-integer number of steps before remapping: " << TSB/dt <<std::endl;
-    //            }
-    //        }
-    //        num_before_remap = round(TSB/dt);
-    //    }
+    fullsave_t = 0.0;
+    timevar_t = 0.0;
 }
 
 

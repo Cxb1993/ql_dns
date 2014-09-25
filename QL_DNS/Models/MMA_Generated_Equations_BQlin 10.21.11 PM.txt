@@ -1,0 +1,48 @@
+Ckl_out[i].block( 0, 0, NZ_, NZ_)  =  fft_.for_2DFull(By.asDiagonal()*(fft_.back_2DFull(Tky*C31)))+ilapFtmp_.asDiagonal()*(fft_.for_2DFull(dzBy.asDiagonal()*((fft_.back_2DFull(T2TdzTiLap2TkxbP2Tky.asDiagonal()*C31)+fft_.back_2DFull(T2TiLap2TkxbTkyP2.asDiagonal()*C41))))+((T2Tdz.asDiagonal()*C21)+(Tm2TkxbTkyTq*C11)));
+
+
+Ckl_out[i].block( 0, NZ_, NZ_, NZ_)  =  fft_.for_2DFull(By.asDiagonal()*(fft_.back_2DFull(Tky*C32)))+ilapFtmp_.asDiagonal()*(fft_.for_2DFull(dzBy.asDiagonal()*((fft_.back_2DFull(T2TdzTiLap2TkxbP2Tky.asDiagonal()*C32)+fft_.back_2DFull(T2TiLap2TkxbTkyP2.asDiagonal()*C42))))+((T2Tdz.asDiagonal()*C22)+(Tm2TkxbTkyTq*C12)));
+
+
+Ckl_out[i].block( 0, 2*NZ_, NZ_, NZ_)  =  fft_.for_2DFull(By.asDiagonal()*(fft_.back_2DFull(Tky*C33)))+ilapFtmp_.asDiagonal()*(fft_.for_2DFull(dzBy.asDiagonal()*((fft_.back_2DFull(T2TdzTiLap2TkxbP2Tky.asDiagonal()*C33)+fft_.back_2DFull(T2TiLap2TkxbTkyP2.asDiagonal()*C43))))+((T2Tdz.asDiagonal()*C23)+(Tm2TkxbTkyTq*C13)));
+
+
+Ckl_out[i].block( 0, 3*NZ_, NZ_, NZ_)  =  fft_.for_2DFull(By.asDiagonal()*(fft_.back_2DFull(Tky*C34)))+ilapFtmp_.asDiagonal()*(fft_.for_2DFull(dzBy.asDiagonal()*((fft_.back_2DFull(T2TdzTiLap2TkxbP2Tky.asDiagonal()*C34)+fft_.back_2DFull(T2TiLap2TkxbTkyP2.asDiagonal()*C44))))+((T2Tdz.asDiagonal()*C24)+(Tm2TkxbTkyTq*C14)));
+
+
+Ckl_out[i].block( NZ_, 0, NZ_, NZ_)  =  fft_.for_2DFull(By.asDiagonal()*(fft_.back_2DFull(Tky*C41)))+fft_.for_2DFull(dzBy.asDiagonal()*(fft_.back_2DFull(Tmkxb*C31)))+fft_.for_2DFull(dzdzBy.asDiagonal()*((fft_.back_2DFull(TmdzTiLap2Tkxb.asDiagonal()*C31)+fft_.back_2DFull(TmiLap2Tky.asDiagonal()*C41))))+(TdzTqPLUSm2Tdz.asDiagonal()*C11);
+
+
+Ckl_out[i].block( NZ_, NZ_, NZ_, NZ_)  =  fft_.for_2DFull(By.asDiagonal()*(fft_.back_2DFull(Tky*C42)))+fft_.for_2DFull(dzBy.asDiagonal()*(fft_.back_2DFull(Tmkxb*C32)))+fft_.for_2DFull(dzdzBy.asDiagonal()*((fft_.back_2DFull(TmdzTiLap2Tkxb.asDiagonal()*C32)+fft_.back_2DFull(TmiLap2Tky.asDiagonal()*C42))))+(TdzTqPLUSm2Tdz.asDiagonal()*C12);
+
+
+Ckl_out[i].block( NZ_, 2*NZ_, NZ_, NZ_)  =  fft_.for_2DFull(By.asDiagonal()*(fft_.back_2DFull(Tky*C43)))+fft_.for_2DFull(dzBy.asDiagonal()*(fft_.back_2DFull(Tmkxb*C33)))+fft_.for_2DFull(dzdzBy.asDiagonal()*((fft_.back_2DFull(TmdzTiLap2Tkxb.asDiagonal()*C33)+fft_.back_2DFull(TmiLap2Tky.asDiagonal()*C43))))+(TdzTqPLUSm2Tdz.asDiagonal()*C13);
+
+
+Ckl_out[i].block( NZ_, 3*NZ_, NZ_, NZ_)  =  fft_.for_2DFull(By.asDiagonal()*(fft_.back_2DFull(Tky*C44)))+fft_.for_2DFull(dzBy.asDiagonal()*(fft_.back_2DFull(Tmkxb*C34)))+fft_.for_2DFull(dzdzBy.asDiagonal()*((fft_.back_2DFull(TmdzTiLap2Tkxb.asDiagonal()*C34)+fft_.back_2DFull(TmiLap2Tky.asDiagonal()*C44))))+(TdzTqPLUSm2Tdz.asDiagonal()*C14);
+
+
+Ckl_out[i].block( 2*NZ_, 0, NZ_, NZ_)  =  fft_.for_2DFull(By.asDiagonal()*(fft_.back_2DFull(Tky*C11)));
+
+
+Ckl_out[i].block( 2*NZ_, NZ_, NZ_, NZ_)  =  fft_.for_2DFull(By.asDiagonal()*(fft_.back_2DFull(Tky*C12)));
+
+
+Ckl_out[i].block( 2*NZ_, 2*NZ_, NZ_, NZ_)  =  fft_.for_2DFull(By.asDiagonal()*(fft_.back_2DFull(Tky*C13)));
+
+
+Ckl_out[i].block( 2*NZ_, 3*NZ_, NZ_, NZ_)  =  fft_.for_2DFull(By.asDiagonal()*(fft_.back_2DFull(Tky*C14)));
+
+
+Ckl_out[i].block( 3*NZ_, 0, NZ_, NZ_)  =  fft_.for_2DFull(By.asDiagonal()*(fft_.back_2DFull(Tky*C21)))+fft_.for_2DFull(dzBy.asDiagonal()*((fft_.back_2DFull(T2TdzTiLap2Tky.asDiagonal()*C21)+fft_.back_2DFull(TdzP2TiLap2TkxbPLUSmiLap2TkxbTkyP2.asDiagonal()*C11))))+fft_.for_2DFull(dzdzBy.asDiagonal()*((fft_.back_2DFull(TdzTiLap2Tkxb.asDiagonal()*C11)+fft_.back_2DFull(TiLap2Tky.asDiagonal()*C21))))+(TmdzTq.asDiagonal()*C31);
+
+
+Ckl_out[i].block( 3*NZ_, NZ_, NZ_, NZ_)  =  fft_.for_2DFull(By.asDiagonal()*(fft_.back_2DFull(Tky*C22)))+fft_.for_2DFull(dzBy.asDiagonal()*((fft_.back_2DFull(T2TdzTiLap2Tky.asDiagonal()*C22)+fft_.back_2DFull(TdzP2TiLap2TkxbPLUSmiLap2TkxbTkyP2.asDiagonal()*C12))))+fft_.for_2DFull(dzdzBy.asDiagonal()*((fft_.back_2DFull(TdzTiLap2Tkxb.asDiagonal()*C12)+fft_.back_2DFull(TiLap2Tky.asDiagonal()*C22))))+(TmdzTq.asDiagonal()*C32);
+
+
+Ckl_out[i].block( 3*NZ_, 2*NZ_, NZ_, NZ_)  =  fft_.for_2DFull(By.asDiagonal()*(fft_.back_2DFull(Tky*C23)))+fft_.for_2DFull(dzBy.asDiagonal()*((fft_.back_2DFull(T2TdzTiLap2Tky.asDiagonal()*C23)+fft_.back_2DFull(TdzP2TiLap2TkxbPLUSmiLap2TkxbTkyP2.asDiagonal()*C13))))+fft_.for_2DFull(dzdzBy.asDiagonal()*((fft_.back_2DFull(TdzTiLap2Tkxb.asDiagonal()*C13)+fft_.back_2DFull(TiLap2Tky.asDiagonal()*C23))))+(TmdzTq.asDiagonal()*C33);
+
+
+Ckl_out[i].block( 3*NZ_, 3*NZ_, NZ_, NZ_)  =  fft_.for_2DFull(By.asDiagonal()*(fft_.back_2DFull(Tky*C24)))+fft_.for_2DFull(dzBy.asDiagonal()*((fft_.back_2DFull(T2TdzTiLap2Tky.asDiagonal()*C24)+fft_.back_2DFull(TdzP2TiLap2TkxbPLUSmiLap2TkxbTkyP2.asDiagonal()*C14))))+fft_.for_2DFull(dzdzBy.asDiagonal()*((fft_.back_2DFull(TdzTiLap2Tkxb.asDiagonal()*C14)+fft_.back_2DFull(TiLap2Tky.asDiagonal()*C24))))+(TmdzTq.asDiagonal()*C34);
+
+

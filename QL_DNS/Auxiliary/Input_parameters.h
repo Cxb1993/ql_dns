@@ -35,7 +35,8 @@ public:
     double L[3];
     
     // Time domain
-    double dt;
+    double dt; // Might be ignored (for a variable time-step integrator)
+    double CFL; // CFL number, might be ignored (for a fixed step integrator)
     double t_final; // Final time
     double t_initial; // Initial time
     double t_start; // Start time (different when loading from file)
@@ -82,9 +83,11 @@ public:
     int nsteps; // Total number of steps
     int timevar_save_nsteps; // Steps before saving timevar
     int fullsol_save_nsteps; // Steps before full save
-    // SB parameters
-    double TSB; // Time before remap = LY/LX/q
-    int num_before_remap;  // Number of steps before remap
+    bool fullsol_save_Q; // Whether or not there is a full save
+    // Times to use in saving
+    double fullsave_t;
+    double timevar_t;
+
     
     // Directory for data storage
     std::string simulation_dir;

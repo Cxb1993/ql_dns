@@ -11,17 +11,20 @@
 
 #include "Integrator.h"
 #include "../solution.h"
+#include "../Auxiliary/Input_parameters.h"
 
 
 class Euler : public Integrator {
 public:
-    Euler(double t0, double dt, Model * mod);
+    Euler(double t0, Inputs& SP, Model * mod);
     ~Euler();
     // Step
-    void Step(double t, solution * sol);
+    double Step(double t, solution * sol);
     
 private:
-    const double dt_;
+    // Time-step
+    double dt_; // This integrator requires a time-step to be specified in inputs!!
+
     const int nxy_, nz_;
     const int nMF_,nLin_;
     
@@ -32,7 +35,7 @@ private:
     solution * sol_rhs_; // Output of model
     
     // Space for linear operator
-    doubVec *linearOp_fluct_;
+    doubVec **linearOp_fluct_;
     doubVec *linearOp_MF_;
     
     // Pointer variables for evaluation - not very clean but couldn't think of a better way!

@@ -16,6 +16,9 @@
 		A241D8A519A95CF800E901AB /* fftwPlans.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D8A319A95CF800E901AB /* fftwPlans.cpp */; };
 		A241D8A819A9629B00E901AB /* Input_parameters.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D8A619A9629B00E901AB /* Input_parameters.cpp */; };
 		A241D8B019ABDA3F00E901AB /* TimeVariables.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D8AE19ABDA3F00E901AB /* TimeVariables.cpp */; };
+		A241D8B919C65E4500E901AB /* FullSave_Load.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D8B719C65E4500E901AB /* FullSave_Load.cpp */; };
+		A241D8BC19C7DDCF00E901AB /* MHD_BQlin.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D8BA19C7DDCF00E901AB /* MHD_BQlin.cpp */; };
+		A241D8C319C922E500E901AB /* RK3CN.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D8C119C922E500E901AB /* RK3CN.cpp */; };
 		A2ED9658199822FF00247E17 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2ED9657199822FF00247E17 /* main.cpp */; };
 		A2ED965A199822FF00247E17 /* QL_DNS.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = A2ED9659199822FF00247E17 /* QL_DNS.1 */; };
 /* End PBXBuildFile section */
@@ -55,6 +58,12 @@
 		A241D8AB19A9757600E901AB /* SConstruct */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = SConstruct; sourceTree = "<group>"; };
 		A241D8AE19ABDA3F00E901AB /* TimeVariables.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = TimeVariables.cpp; sourceTree = "<group>"; };
 		A241D8AF19ABDA3F00E901AB /* TimeVariables.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TimeVariables.h; sourceTree = "<group>"; };
+		A241D8B719C65E4500E901AB /* FullSave_Load.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = FullSave_Load.cpp; sourceTree = "<group>"; };
+		A241D8B819C65E4500E901AB /* FullSave_Load.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FullSave_Load.h; sourceTree = "<group>"; };
+		A241D8BA19C7DDCF00E901AB /* MHD_BQlin.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MHD_BQlin.cpp; sourceTree = "<group>"; };
+		A241D8BB19C7DDCF00E901AB /* MHD_BQlin.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MHD_BQlin.h; sourceTree = "<group>"; };
+		A241D8C119C922E500E901AB /* RK3CN.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = RK3CN.cpp; sourceTree = "<group>"; };
+		A241D8C219C922E500E901AB /* RK3CN.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RK3CN.h; sourceTree = "<group>"; };
 		A2ED9654199822FF00247E17 /* QL_DNS */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = QL_DNS; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2ED9657199822FF00247E17 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		A2ED9659199822FF00247E17 /* QL_DNS.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = QL_DNS.1; sourceTree = "<group>"; };
@@ -78,6 +87,8 @@
 			isa = PBXGroup;
 			children = (
 				A241D88D19A391AE00E901AB /* Model.h */,
+				A241D8BB19C7DDCF00E901AB /* MHD_BQlin.h */,
+				A241D8BA19C7DDCF00E901AB /* MHD_BQlin.cpp */,
 				A241D88E19A391AE00E901AB /* ConstantDamping.cpp */,
 				A241D88F19A391AE00E901AB /* ConstantDamping.h */,
 			);
@@ -87,6 +98,8 @@
 		A241D89119A391C300E901AB /* Integrators */ = {
 			isa = PBXGroup;
 			children = (
+				A241D8C119C922E500E901AB /* RK3CN.cpp */,
+				A241D8C219C922E500E901AB /* RK3CN.h */,
 				A241D89D19A6375600E901AB /* EulerCN.cpp */,
 				A241D89E19A6375600E901AB /* EulerCN.h */,
 				A241D89219A391C300E901AB /* Euler.cpp */,
@@ -109,6 +122,8 @@
 				A241D8A719A9629B00E901AB /* Input_parameters.h */,
 				A241D8AE19ABDA3F00E901AB /* TimeVariables.cpp */,
 				A241D8AF19ABDA3F00E901AB /* TimeVariables.h */,
+				A241D8B719C65E4500E901AB /* FullSave_Load.cpp */,
+				A241D8B819C65E4500E901AB /* FullSave_Load.h */,
 			);
 			path = Auxiliary;
 			sourceTree = "<group>";
@@ -198,7 +213,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A241D8BC19C7DDCF00E901AB /* MHD_BQlin.cpp in Sources */,
 				A241D89A19A3C6DD00E901AB /* MPIdata.cpp in Sources */,
+				A241D8C319C922E500E901AB /* RK3CN.cpp in Sources */,
 				A241D8A219A7922F00E901AB /* Kdata.cpp in Sources */,
 				A241D8B019ABDA3F00E901AB /* TimeVariables.cpp in Sources */,
 				A241D8A819A9629B00E901AB /* Input_parameters.cpp in Sources */,
@@ -207,6 +224,7 @@
 				A241D88B19A3907B00E901AB /* solution.cpp in Sources */,
 				A241D8A519A95CF800E901AB /* fftwPlans.cpp in Sources */,
 				A2ED9658199822FF00247E17 /* main.cpp in Sources */,
+				A241D8B919C65E4500E901AB /* FullSave_Load.cpp in Sources */,
 				A241D89719A3928500E901AB /* Euler.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

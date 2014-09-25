@@ -1,48 +1,57 @@
 //
-//  EulerCN.h
+//  RK3CN.h
 //  QL_DNS
 //
-//  Created by Jonathan Squire on 8/21/14.
+//  Created by Jonathan Squire on 9/17/14.
 //  Copyright (c) 2014 J Squire. All rights reserved.
 //
 
-#ifndef __QL_DNS__EulerCN__
-#define __QL_DNS__EulerCN__
+#ifndef __QL_DNS__RK3CN__
+#define __QL_DNS__RK3CN__
 
 #include "Integrator.h"
 #include "../solution.h"
 
-class EulerCN : public Integrator {
+class RK3CN : public Integrator {
 public:
-    EulerCN(double t0, Inputs& SP, Model * mod);
-    ~EulerCN();
+    RK3CN(double t0, Inputs& SP, Model * mod);
+    ~RK3CN();
     // Step
     double Step(double t, solution * sol);
     
 private:
     // Time-step
-    double dt_; // This integrator requires a time-step to be specified in inputs!!
+    double dt_, lin_dt_;
+    double CFLnum_;
+    bool variable_dt_;
+    
     const int nxy_, nz_;
     const int nMF_, nLin_;
+    
+    // Integrator parameters
+    const double a0_,a1_,a2_,b1_,b2_,p1_,p2_;
+    double linC_, NLC1_, NLC2_; // Coefficients for each step
+    
     
     // Model
     Model * model_;
     
     // Space for integrator evaluation
-    solution * sol_rhs_; // Output of model
+    solution * sol_rhs_, *sol_rhs2_ ; // Output of model
     
     // Space for linear operators
     doubVec **linearOp_fluct_,**linearOp_fluct_old_;
-    doubVec *linearOp_MF_NLCo_,*linearOp_MF_LinCo_;
+    doubVec *linearOp_MF_;
     
     // Pointer variables for evaluation - not very clean but couldn't think of a better way!
     dcmplx *dLin_,*dLin_rhs_;
     double *lin_op_, *lin_op_old_;
-    doubVec denom;
+    doubVec denom; // Used for both mean and fluctuations
 };
 
 
 
 
+#endif /* defined(__QL_DNS__RK3CN__) */
 
-#endif /* defined(__QL_DNS__EulerCN__) */
+

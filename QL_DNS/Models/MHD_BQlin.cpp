@@ -1,43 +1,62 @@
 //
-//  ConstantDamping.cpp
+//  MHD_BQlin.cpp
 //  QL_DNS
 //
-//  Created by Jonathan Squire on 8/19/14.
+//  Created by Jonathan Squire on 9/16/14.
 //  Copyright (c) 2014 J Squire. All rights reserved.
 //
 
-#include "ConstantDamping.h"
+#include "MHD_BQlin.h"
 
-ConstantDamping::ConstantDamping(const Inputs& sp, MPIdata& mpi, fftwPlans& fft) :
-dampFac(0.5),
-equations_name("ConstantDamping"),
-numMF_(1), numLin_(4),
-f_noise_(sp.f_noise), nu_(sp.nu), eta_(sp.eta),
+// Includes interaction of fluctuations with By and that's all
+MHD_BQlin::MHD_BQlin(const Inputs& sp, MPIdata& mpi, fftwPlans& fft) :
+equations_name("MHD_BQlin"),
+numMF_(2), numLin_(4),
 q_(sp.q),
+nu_(sp.nu), eta_(sp.eta),
+f_noise_(sp.f_noise),QL_YN_(sp.QuasiLinearQ),
 dont_drive_ky0_modes_(0),// If true, no driving ky=0 modes
 Model(sp.NZ, sp.NXY , sp.L), // Dimensions - stored in base
 mpi_(mpi), // MPI data
 fft_(fft) // FFT data
 {
+    // Check that model is that specified in input file
+    if (sp.equations_to_use != equations_name) {
+        std::stringstream error_str;
+        error_str << "Model name, " << equations_name << ", does not match that specified in input file, " << sp.equations_to_use << "!!" << std::endl;
+        mpi.print1( error_str.str() );
+        ABORT;
+    }
+    
     // Setup MPI
     mpi_.Split_NXY_Grid( Dimxy_full() ); // Work out MPI splitting
     // Assign K data
     K = new Kdata(this, &mpi_); // Stores all the K data
     // Fourier transform plans
-    fft_.calculatePlans( N(2),NZ() );
+    fft_.calculatePlans( NZfull(), NZ() );
+    
     
     // Random generator
-    mt_ = boost::random::mt19937(1.0 + mpi_.my_n_v());  // Seed is 1.0, could change
+    mt_ = boost::random::mt19937(clock()/((double) CLOCKS_PER_SEC) + mpi_.my_n_v());  // Seed is from time
     ndist_ = boost::random::normal_distribution<double>(0,f_noise_/2); // Normal distribution, standard deviation f_noise_ (factor 2 is since it's complex)
-    noise_buff_ = dcmplxVec(num_Lin()*(NZ()-1));// NZ-1 since ky=kz=0 mode is not driven
+    noise_buff_len_ = NZ()-1;
+    noise_buff_ = dcmplxVec(num_Lin()*noise_buff_len_);// NZ()-1 since ky=kz=0 mode is not driven
     
     // Sizes of various arrays used for normalizing things
     totalN2_ = N(0)*N(1)*N(2); // Total number of grid points
     totalN2_ = totalN2_*totalN2_; // Squared
     mult_noise_fac_ = 1.0/(16*32*32); // Defined so that consistent with (16, 32, 32) results
     mult_noise_fac_ = mult_noise_fac_*mult_noise_fac_;
-    // NZ^2 for normalizing  mean field energy
-    nz2_ = N(2)*N(2);
+    
+    
+    // Reynolds stresses
+    bzux_m_uzbx_c_ = dcmplxVec::Zero(NZ());
+    bzuy_m_uzby_c_ = dcmplxVec::Zero(NZ());
+    bzux_m_uzbx_d_ = doubVec::Zero(NZ());
+    bzuy_m_uzby_d_ = doubVec::Zero(NZ());
+    // Send/receive buffers for MPI, for some reason MPI::IN_PLACE is not giving the correct result!
+    reynolds_stress_MPI_send_ = doubVec::Zero(num_MFs()*NZ());
+    reynolds_stress_MPI_receive_ = doubVec::Zero(num_MFs()*NZ());
     
     
     ////////////////////////////////////////////////////
@@ -50,84 +69,185 @@ fft_(fft) // FFT data
     ilapFtmp_ = doubVec( NZ() ); // Inverse
     lap2tmp_ = doubVec( NZ() ); // For ky^2+kz^2 - could be pre-assigned
     ilap2tmp_ = doubVec( NZ() ); // Inverse
+    
+    // Temps for evaulation of main equations
+    uy_ = dcmplxVec( NZ() );
+    uz_ = dcmplxVec( NZ() );
+    by_ = dcmplxVec( NZ() );
+    bz_ = dcmplxVec( NZ() );
+    // Size NZfull() (kx,ky,z)
+    tmp1_z_ = dcmplxVec( NZfull() );
+    tmp2_z_ = dcmplxVec( NZfull() );
+    tmp3_z_ = dcmplxVec( NZfull() );
+    // Size NZ() (kz,ky,kz)
+    tmp1_k_ = dcmplxVec( NZ() );
+    tmp2_k_ = dcmplxVec( NZ() );
+    tmp3_k_ = dcmplxVec( NZ() );
 
 
+    
+    //  Real space versions of B - non-dealiased dimension
+    By_ = dcmplxVec::Zero( NZfull() );
+    dzBy_ = dcmplxVec::Zero( NZfull() );
+    dzdzBy_ = dcmplxVec::Zero( NZfull() );
+    
 }
 
 
-ConstantDamping::~ConstantDamping(){
+MHD_BQlin::~MHD_BQlin(){
     delete K;
 }
 
-void ConstantDamping::rhs(const double t, const double dt_lin,
-               const solution * SolIn, solution * SolOut,doubVec **linOpFluct) {
+void MHD_BQlin::rhs(const double t, const double dt_lin,
+                          const solution * SolIn, solution * SolOut,doubVec **linOpFluct) {
+    // Calculate mean fields in real space
+    // Calculate MFs in real space     By_ = MFin[1].matrix()*fft1Dfac_; // fft back doesn't include normalization
+    // (NB could be optimized slightly by including memory copy in multiplication)
+    uy_ = (*SolIn->pMF(1))*fft_.fac1D();// Use uy_ as tmp variable
+    fft_.inverse( &uy_, &By_);
+    uy_ = fft_.fac1D()*K->kz*(*SolIn->pMF(1));
+    fft_.inverse( &uy_, &dzBy_);
+    uy_ = fft_.fac1D()*K->kz2*(*SolIn->pMF(1));
+    fft_.inverse( &uy_, &dzdzBy_);
     
+    // Reynolds stresses -- added to at each step in the loop
+    bzux_m_uzbx_d_.setZero();
+    bzuy_m_uzby_d_.setZero();
+    
+    uy_ = (*SolIn->pMF(1))*fft_.fac1D();
+    fft_.inverse( &uy_, &By_);
+
+    
+    /////////////////////////////////////
+    //   ALL OF THIS IS PARALLELIZED
     for (int i=0; i<Dimxy(); ++i) {
         // Full Loop containing all the main work equation
         ///////////////////////////////////////
         ///// MAIN EQUATIONS
         
-        assign_laplacians_(i, t, 1);
-        for (int Vn=0; Vn<num_Lin(); ++Vn) {
-            *( SolOut->pLin(i,Vn) ) = -(*( SolIn->pLin(i,Vn) ))*dampFac;
-        }
+        assign_laplacians_(i, t, 1); // Assign kx, lapF etc.
+        
+        // convenient to define uy, uz etc.,
+        uy_ = ( (-kyctmp_*kxctmp_)*(*SolIn->pLin(i, 0)) +  K->kz*(*SolIn->pLin(i, 1)) )*ilap2tmp_;
+        uz_ = ( -kxctmp_*K->kz*(*SolIn->pLin(i, 0)) -  kyctmp_*(*SolIn->pLin(i, 1)) )*ilap2tmp_;
+        by_ = ( (-kyctmp_*kxctmp_)*(*SolIn->pLin(i, 2)) +  K->kz*(*SolIn->pLin(i, 3)) )*ilap2tmp_;
+        bz_ = ( -kxctmp_*K->kz*(*SolIn->pLin(i, 2)) -  kyctmp_*(*SolIn->pLin(i, 3)) )*ilap2tmp_;
+        
+        ////////////////////////////////
+        // Linear RHS
+        
+        // u
+        // -2*P.q*kx*ky.*U.u./K.lapF+2*K.kz.*U.zeta./K.lapF-2*S.dealias.*fft(DxybzDzB,[],3)./K.lapF +S.dealias.*fft(BDyb,[],3)
+        tmp1_k_ = (fft_.fac1D()*kyctmp_)*(*SolIn->pLin(i, 2));
+        fft_.inverse(&tmp1_k_, &tmp1_z_);
+        tmp1_z_ *= By_;
+        tmp2_k_ = (-2.0*fft_.fac1D()*kxctmp_*kyctmp_)*bz_;
+        fft_.inverse(&tmp2_k_, &tmp2_z_);
+        tmp2_z_ *= dzBy_;
+        // Inverse
+        fft_.forward(&tmp1_z_, SolOut->pLin(i, 0));
+        fft_.forward(&tmp2_z_, &tmp2_k_);
+        *SolOut->pLin(i, 0) += ( (-2.0*kxctmp_*kyctmp_*q_)*(*SolIn->pLin(i, 0))  +  2*K->kz*(*SolIn->pLin(i, 1))  +  tmp2_k_)*ilapFtmp_;
+        
+        // zeta
+        // (P.q-2)*K.kz.*U.u+S.dealias.*fft(BDyeta+bzDzzB-DxbDzB,[],3)
+        tmp1_k_ = (fft_.fac1D()*kyctmp_)*(*SolIn->pLin(i, 3));
+        fft_.inverse(&tmp1_k_, &tmp1_z_);
+        tmp1_z_ *= By_;
+        tmp2_k_ = (-fft_.fac1D()*kxctmp_)*(*SolIn->pLin(i, 2));
+        fft_.inverse(&tmp2_k_, &tmp2_z_);
+        tmp2_z_ *= dzBy_;
+        tmp3_k_ = fft_.fac1D()*bz_;
+        fft_.inverse(&tmp3_k_, &tmp3_z_);
+        tmp3_z_ *= dzdzBy_;
+        tmp1_z_ += tmp2_z_ + tmp3_z_;
+        // Inverse
+        fft_.forward(&tmp1_z_, SolOut->pLin(i, 1));
+        *SolOut->pLin(i, 1) += (q_-2.0)*K->kz*(*SolIn->pLin(i, 0));
+        
+        // b
+        // fft(By*ifft(ky*u))
+        tmp1_k_ = (fft_.fac1D()*kyctmp_)*(*SolIn->pLin(i, 0));
+        fft_.inverse(&tmp1_k_, &tmp1_z_);
+        tmp1_z_ *= By_;
+        fft_.forward(&tmp1_z_, SolOut->pLin(i, 2));
+        
+        // eta
+        // -P.q*K.kz.*U.b+S.dealias.*fft(BDyzeta-2*DzuzDzB-uzDzzB-DxuDzB,[],3)
+        tmp1_k_ = (fft_.fac1D()*kyctmp_)*(*SolIn->pLin(i, 1));
+        fft_.inverse(&tmp1_k_, &tmp1_z_);
+        tmp1_z_ *= By_;
+        tmp2_k_ = (-2*fft_.fac1D()*K->kz*uz_)-(fft_.fac1D()*kxctmp_)*(*SolIn->pLin(i, 0));
+        fft_.inverse(&tmp2_k_, &tmp2_z_);
+        tmp2_z_ *= dzBy_;
+        tmp3_k_ = -fft_.fac1D()*uz_;
+        fft_.inverse(&tmp3_k_, &tmp3_z_);
+        tmp3_z_ *= dzdzBy_;
+        tmp1_z_ += tmp2_z_ + tmp3_z_;
+        // Inverse
+        fft_.forward(&tmp1_z_, SolOut->pLin(i, 3));
+        *SolOut->pLin(i, 3) -= q_*K->kz*(*SolIn->pLin(i, 2));
+        
+
+//        for (int vn=0; vn<num_Lin(); ++vn) {
+//            cout << SolOut->pLin(i, vn)->transpose() << endl;
+//        }
+//        cout << endl;
         
         
-    
         ////////////////////////////////////////
         //////   LINEAR PART
         // Need to re-evaluate laplacian, since different time.
         kxtmp_=kxtmp_ + q_*dt_lin*kytmp_;
-        
-        linOpFluct[i][0].setZero();
-        linOpFluct[i][1].setZero();
-        linOpFluct[i][2].setZero();
-        linOpFluct[i][3].setZero();
-
-//        linOpFluct[i][0] = nu_*((-kxtmp_*kxtmp_-kytmp_*kytmp_)+ K->kz2);
-//        linOpFluct[i][1] = linOpFluct[i][0];
-//        linOpFluct[i][2]  = (eta_/nu_)*linOpFluct[i][0];// Saves some calculation
-//        linOpFluct[i][3] = linOpFluct[i][2];
+        linOpFluct[i][0] = nu_*((-kxtmp_*kxtmp_-kytmp_*kytmp_)+ K->kz2);
+        linOpFluct[i][1] = linOpFluct[i][0];
+        linOpFluct[i][2]  = (eta_/nu_)*linOpFluct[i][0];// Saves some calculation
+        linOpFluct[i][3] = linOpFluct[i][2];
         
         ////////////////////////////////////////
-    
+        
         
     }
     for (int i=0; i<num_MFs(); ++i) {
-        (*( SolOut->pMF(i) )).setZero();;
+         SolOut->pMF(i)->setZero();
     }
     
-
+    
 }
 
-void ConstantDamping::linearOPs_Init(double t0, doubVec **linOpFluct, doubVec *linOpMF){
+void MHD_BQlin::linearOPs_Init(double t0, doubVec **linOpFluct, doubVec *linOpMF){
+    
     // Fluctuations
     for (int i=0; i<Dimxy(); ++i) {
-        for (int j=0; j<num_Lin(); ++j) {
-            linOpFluct[i][j].setZero();
-        }
+        assign_laplacians_(i, t0, 0); // Assign kx, lapF etc.
+        linOpFluct[i][0] = nu_*lapFtmp_;
+        linOpFluct[i][1] = linOpFluct[i][0];
+        linOpFluct[i][2]  = (eta_/nu_)*linOpFluct[i][0];// Saves some calculation
+        linOpFluct[i][3] = linOpFluct[i][2];
     }
     // Mean fields
     for (int i=0; i<num_MFs(); ++i) {
-        linOpMF[i].setZero();
+        linOpMF[i]=eta_*K->kz2;
     }
 }
+
 
 
 //////////////////////////////////////////////////////////
 //   Remapping
 // Remapping for the shearing box
 // Using the Lithwick method of continuously remapping wavenumbers when they become too large
-void ConstantDamping::ShearingBox_Remap(double qt, solution *sol){
+void MHD_BQlin::ShearingBox_Remap(double qt, solution *sol){
+    double kxLfac=2*PI/L(0);// Define these for clarity
     int nx = N(0)-1;
     
     double kxt;
     for (int i=0; i<Dimxy(); ++i) {
         kxt = K->kx[i].imag() + qt*K->ky[i].imag();
         // If kx has grown too large
-        if (kxt > nx/2*K->kxLfac) {
+        if (kxt > nx/2*kxLfac) {
             // Put kx back in correct range
-            K->kx[i] = K->kx[i] - dcmplx(0,nx*K->kxLfac);
+            K->kx[i] = K->kx[i] - dcmplx(0,nx*kxLfac);
             // zero out solution
             for (int Vn=0; Vn<num_Lin(); ++Vn) {
                 (sol->pLin(i, Vn))->setZero();
@@ -140,7 +260,7 @@ void ConstantDamping::ShearingBox_Remap(double qt, solution *sol){
 
 //////////////////////////////////////////////////////////
 //    ENERGY/MOMENTUM ETC.
-void ConstantDamping::Calc_Energy_AM_Diss(TimeVariables& tv, double t, const solution *sol) {
+void MHD_BQlin::Calc_Energy_AM_Diss(TimeVariables& tv, double t, const solution *sol) {
     // Energy, angular momentum and dissipation of the solution MFin and Cin
     // TimeVariables class stores info and data about energy, AM etc.
     // t is time
@@ -177,8 +297,8 @@ void ConstantDamping::Calc_Energy_AM_Diss(TimeVariables& tv, double t, const sol
             lap2tmp_ = lapFtmp_*ilap2tmp_; // lap2tmp_ just a convenient storage
             
             // (NB: ilap2tmp_ is negative but want abs, just use -ilap2)
-            energy_u += mult_fac*(  lap2tmp_*(( *(sol->pLin(i,0)) ).abs2()) - ilap2tmp_*(( *(sol->pLin(i,1)) ).abs2())  ).sum();
-            energy_b += mult_fac*(  lap2tmp_*(( *(sol->pLin(i,2)) ).abs2()) - ilap2tmp_*(( *(sol->pLin(i,3)) ).abs2())  ).sum();
+            energy_u += mult_fac*(  lap2tmp_*( *(sol->pLin(i,0)) ).abs2() - ilap2tmp_*( *(sol->pLin(i,1)) ).abs2()  ).sum();
+            energy_b += mult_fac*(  lap2tmp_*( *(sol->pLin(i,2)) ).abs2() - ilap2tmp_*( *(sol->pLin(i,3)) ).abs2()  ).sum();
             //////////////////////////////////////
         }
         if (tv.AngMom_save_Q()){
@@ -223,8 +343,8 @@ void ConstantDamping::Calc_Energy_AM_Diss(TimeVariables& tv, double t, const sol
         double AM_MU =0, AM_MB=0;
         double diss_MU =0, diss_MB =0;
         
-        energy_MB = ( (*(sol->pMF(0))).abs2().sum() )/nz2_;
-       
+        energy_MB = ( (*(sol->pMF(0))).abs2().sum() + (*(sol->pMF(1))).abs2().sum() )/( NZ()*NZ() );
+        
         
         AM_MB = 0;
         AM_MU = 0;
@@ -266,9 +386,24 @@ void ConstantDamping::Calc_Energy_AM_Diss(TimeVariables& tv, double t, const sol
 }
 
 
+
+////////////////////////////////////////////////////////////
+////   DEALIASING
+////1-D version - takes a dcmplxVec input
+//void MHD_BQlin::dealias(dcmplxVec& vec) {
+//    vec.segment(dealiasBnds_[1], dealiasBnds_[0]).setZero();
+//}
+//
+////1-D version - takes a doubVec input
+//void MHD_BQlin::dealias(doubVec& vec) {
+//    vec.segment(dealiasBnds_[1], dealiasBnds_[0]).setZero();
+//}
+
+
+
 //////////////////////////////////////////////////////////
 //   AUXILIARY FUNCTIONS
-inline void ConstantDamping::assign_laplacians_(int i, double t, bool need_inverse){
+inline void MHD_BQlin::assign_laplacians_(int i, double t, bool need_inverse){
     ind_ky_ = K->ky_index[i];
     // Form Laplacians using time-dependent kx
     kyctmp_ = K->ky[i];
@@ -279,8 +414,10 @@ inline void ConstantDamping::assign_laplacians_(int i, double t, bool need_inver
     lap2tmp_ = K->lap2[ind_ky_];
     lapFtmp_ = -kxtmp_*kxtmp_ + lap2tmp_;
     if (need_inverse){
-        ilapFtmp_ = 1/lapFtmp_;
         ilap2tmp_ = K->ilap2[ind_ky_];
+        ilapFtmp_ = 1/lapFtmp_;
+        if (ind_ky_ == 0 && K->kx_index[i]==0)
+            ilapFtmp_(0) = 1.0; // Otherwise get nans
     }
 }
 //////////////////////////////////////////////////////////
@@ -288,13 +425,9 @@ inline void ConstantDamping::assign_laplacians_(int i, double t, bool need_inver
 
 
 
-
-
-
-
 //////////////////////////////////////////////////////////
 //   DRIVING NOISE
-void ConstantDamping::DrivingNoise(double t, double dt, solution *sol) {
+void MHD_BQlin::DrivingNoise(double t, double dt, solution *sol) {
     // NZ() is now dealiased NZ!!!
     // So - drive all of NZ and Nyquist frequency is not included
     
@@ -356,7 +489,7 @@ void ConstantDamping::DrivingNoise(double t, double dt, solution *sol) {
         K->i_from = K->match_kx_from.begin();
         K->i_fp = K->match_kx_from_p.begin();
         K->i_sp = K->match_kx_tosend_p.begin();
-        int nz = NZ()-1; // For noise
+        
 #ifdef USE_MPI_FLAG
         //////////////////////////////////////////////////
         // Sending - create noise here and broadcast
@@ -371,7 +504,7 @@ void ConstantDamping::DrivingNoise(double t, double dt, solution *sol) {
             assign_laplacians_(i,t,0); // Assign laplacian's - no inverses
             
             double noise_multfac = dt*totalN2_*mult_noise_fac_; // f_noise is included in normal distribution
-            lap2tmp_(0) = 0.0; // Don't drive ky=kz=0
+            lap2tmp_(0) = 0.0; // Don't drive ky=kz=0 (not really necessary)
             
             lapFtmp_ = noise_multfac*lap2tmp_/lapFtmp_; // lapFtmp_ is no longer lapF!
             
@@ -390,21 +523,21 @@ void ConstantDamping::DrivingNoise(double t, double dt, solution *sol) {
                 ePoint[jj] += noise_buff_dat_[jj-1];
             }
             // zeta
-            noise_buff_dat_ = noise_buff_.data()+nz;
+            noise_buff_dat_ += noise_buff_len_;
             ePoint = (*(sol->pLin(i,1) )).data();
             for (int jj=1; jj<NZ(); ++jj){
                 noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
                 ePoint[jj] += noise_buff_dat_[jj-1];
             }
             // b
-            noise_buff_dat_ = noise_buff_.data()+2*nz;
+            noise_buff_dat_ += noise_buff_len_;
             ePoint = (*(sol->pLin(i,2) )).data();
             for (int jj=1; jj<NZ(); ++jj){
                 noise_buff_dat_[jj-1]=multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
                 ePoint[jj] += noise_buff_dat_[jj-1];
             }
             // eta
-            noise_buff_dat_ = noise_buff_.data()+3*nz;
+            noise_buff_dat_ += noise_buff_len_;
             ePoint = (*(sol->pLin(i,3) )).data();
             for (int jj=1; jj<NZ(); ++jj){
                 noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
@@ -412,7 +545,7 @@ void ConstantDamping::DrivingNoise(double t, double dt, solution *sol) {
             }
             
             // Send data
-            mpi_.Send_dcmplx(noise_buff_.data(), num_Lin()*nz, *(K->i_sp), *(K->i_tosend));
+            mpi_.Send_dcmplx(noise_buff_.data(), num_Lin()*noise_buff_len_, *(K->i_sp), *(K->i_tosend));
             
             //        cout << "(kx,ky)=(" << K->kx[i] <<"," << K->ky[i] << ")" << endl;
             //        cout << noise_buff_.segment(0, nz).transpose() << endl<<endl;
@@ -426,11 +559,11 @@ void ConstantDamping::DrivingNoise(double t, double dt, solution *sol) {
             
             int i = *(K->i_loc);
             // Receive data from matching call
-            mpi_.Recv_dcmplx(noise_buff_.data(), num_Lin()*nz, *(K->i_fp), *(K->i_from));
+            mpi_.Recv_dcmplx(noise_buff_.data(), num_Lin()*noise_buff_len_, *(K->i_fp), *(K->i_from));
             
             // Flip noise around
             for (int nV=0; nV<num_Lin(); ++nV) {
-                noise_buff_.segment(nV*nz, nz).reverseInPlace();
+                noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).reverseInPlace();
             }
             
             //        cout << "(kx,ky)=(" << K->kx[i] <<"," << K->ky[i] << ")" << endl;
@@ -438,7 +571,7 @@ void ConstantDamping::DrivingNoise(double t, double dt, solution *sol) {
             
             // Add to solution
             for (int nV=0; nV<num_Lin(); ++nV) {
-                (*(sol->pLin(i,nV) )).segment(1,nz) += noise_buff_.segment(nV*nz, nz).conjugate();
+                (*(sol->pLin(i,nV) )).segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
             }
             
             
@@ -461,7 +594,6 @@ void ConstantDamping::DrivingNoise(double t, double dt, solution *sol) {
             
             double noise_multfac = dt*totalN2_*mult_noise_fac_; // f_noise is included in normal distribution
             lap2tmp_(0) = 0.0; // Don't drive ky=kz=0
-            lap2tmp_(NZ()/2)=0.0; // Or Nyquist
             
             lapFtmp_ = noise_multfac*lap2tmp_/lapFtmp_; // lapFtmp_ is no longer lapF!
             
@@ -480,21 +612,21 @@ void ConstantDamping::DrivingNoise(double t, double dt, solution *sol) {
                 ePoint[jj] += noise_buff_dat_[jj-1];
             }
             // zeta
-            noise_buff_dat_ = noise_buff_.data()+nz;
+            noise_buff_dat_ += noise_buff_len_;
             ePoint = (*(sol->pLin(i,1) )).data();
             for (int jj=1; jj<NZ(); ++jj){
                 noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
                 ePoint[jj] += noise_buff_dat_[jj-1];
             }
             // b
-            noise_buff_dat_ = noise_buff_.data()+2*nz;
+            noise_buff_dat_ += noise_buff_len_;
             ePoint = (*(sol->pLin(i,2) )).data();
             for (int jj=1; jj<NZ(); ++jj){
                 noise_buff_dat_[jj-1]=multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
                 ePoint[jj] += noise_buff_dat_[jj-1];
             }
             // eta
-            noise_buff_dat_ = noise_buff_.data()+3*nz;
+            noise_buff_dat_ += noise_buff_len_;
             ePoint = (*(sol->pLin(i,3) )).data();
             for (int jj=1; jj<NZ(); ++jj){
                 noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
@@ -507,12 +639,12 @@ void ConstantDamping::DrivingNoise(double t, double dt, solution *sol) {
             
             // Flip noise around
             for (int nV=0; nV<num_Lin(); ++nV) {
-                noise_buff_.segment(nV*nz, nz).reverseInPlace();
+                noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).reverseInPlace();
             }
             
             // Add to solution
             for (int nV=0; nV<num_Lin(); ++nV) {
-                (*(sol->pLin(i,nV) )).segment(1,nz) += noise_buff_.segment(nV*nz, nz).conjugate();
+                (*(sol->pLin(i,nV) )).segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
             }
             
             
