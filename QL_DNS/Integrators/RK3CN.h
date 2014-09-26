@@ -19,10 +19,13 @@ public:
     // Step
     double Step(double t, solution * sol);
     
+    // Average time step
+    double mean_time_step() const {return dt_mean_/step_count_;};
 private:
     // Time-step
     double dt_, lin_dt_;
-    double CFLnum_;
+    double CFLnum_, dtmax_,dt_mean_;
+    int step_count_;
     bool variable_dt_;
     
     const int nxy_, nz_;
@@ -47,6 +50,8 @@ private:
     dcmplx *dLin_,*dLin_rhs_;
     double *lin_op_, *lin_op_old_;
     doubVec denom; // Used for both mean and fluctuations
+    
+    //
 };
 
 

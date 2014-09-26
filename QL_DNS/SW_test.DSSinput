@@ -6,23 +6,24 @@ Format: variable_ = var (can have arbitrary number of spaces around = )
 equations_to_use_ = MHD_BQlin 
 // Box parameters
 lx_ = 1.000000000000000, ly_ = 1.0, lz_ = 1.000000000000000
-nx_ = 32,  ny_ = 32,  nz_ =32,
+nx_ = 32,  ny_ = 32,  nz_ = 32,
 
 // Time parameters
-dt_ = 0.10000000000000
-t_initial_ = 0.000000000000000,   t_final_ = 40.000000000000000,
+dt_ = -0.20000000000000 // If negative, specifies maximum
+CFL_ = 1.7;
+t_initial_ = 0.000000000000000,   t_final_ = 500.000000000000000,
 
 // Saving
-tv_save_ = 0.10000000000000,   // Save energy, momentum etc. time-step
-full_save_ = 80.00000000000000,   // Save full solution
+tv_save_ =0.3000000000000,   // Save energy, momentum etc. time-step
+full_save_ = 0.00000000000000,   // Save full solution
 save_energy? =1  save_angular_mom? =0     save_dissipation?=0, // On-off flags
 save_reynolds_stress?= 0
 mean_field_save? = 0  // Save mean fields
 
 // General physical parameters
 q_ = 1.500000000000000 
-nu_ = 0.00100000,  eta_ = 0.001000,   // Dissipation parameters
-f_noise_ = 1.000000000000000
+nu_ = 0.000200000,  eta_ = 0.0002000,   // Dissipation parameters
+f_noise_ = 40.000000000000000
 
 // Initial conditions
 initial_By_ = 0.1000000000000
@@ -31,4 +32,4 @@ Remap? = 1
 QuasiLinear? = 1
 
 // Restart simulation
-start_from_saved? = 1
+start_from_saved? = 0

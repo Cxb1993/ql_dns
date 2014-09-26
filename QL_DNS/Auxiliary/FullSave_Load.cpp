@@ -98,13 +98,16 @@ clk_diff_(0.0)// Timing
         
         
         // Add ky and kz at this time. Could add other global properties (that don't change in time) here if this ends up being important
+        htri_t kyexist = H5Lexists( file, "/ky", H5P_DEFAULT );
+        htri_t kzexist = H5Lexists( file, "/kz", H5P_DEFAULT );
         // ky
         for (int j=0; j<nxy_; ++j)
             kbuff_[j] = K_->ky[j].imag();
         mpi_->PassToNode0_float(kbuff_, kybuff, nxy_); // Pass to 0 proc
         hid_t ky_dset;
-        if (!start_from_saved()) {
+        if (!kyexist) {
             ky_dset = H5Dcreate(file, "ky", H5T_NATIVE_FLOAT, kx_dspace,  H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            SP.start_from_saved_Q = 0; // For TimeVariables - the only reason this wouldn't exist is if initial conditions are written by matlab, in which case should overwrite energy etc.
         } else {
             ky_dset = H5Dopen2(file, "/ky", H5P_DEFAULT);
         }
@@ -117,7 +120,7 @@ clk_diff_(0.0)// Timing
         // kz
         hid_t kz_dspace  = H5Screate_simple(1, &nz_, NULL);
         hid_t kz_dset;
-        if (!start_from_saved()) {
+        if (!kzexist) {
             kz_dset = H5Dcreate(file, "kz", H5T_NATIVE_DOUBLE, kz_dspace,
                                 H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
         } else {
@@ -139,7 +142,7 @@ clk_diff_(0.0)// Timing
 
 
 FullSave_Load::~FullSave_Load(){
-    if (saveQ_) {
+    if (saveQ_ || start_from_saved_Q_) {
         
         H5Sclose(lin_dspace);
         H5Sclose(MF_dspace);
@@ -257,6 +260,10 @@ void FullSave_Load::SaveSolution(double t, solution *sol){
 
 // Resets Solution (initial condition), various parts of Inputs (starting time), and K->kx, to saved values
 void FullSave_Load::LoadSolution_forRestart(solution *sol, Inputs &SP){
+    
+    // Start timing
+    clk_start_ = clock();
+
     // Have already checked .h5 file exists in the constructor
     
     // Find the latest time (largest t) saved group
@@ -280,7 +287,6 @@ void FullSave_Load::LoadSolution_forRestart(solution *sol, Inputs &SP){
         lin_dset[jj] = H5Dopen2(fsave_grp, dsetname_.str().c_str(), H5P_DEFAULT);
         
     }
-    
     //    Read Data
     // Fluctuating fields
     for (int i=0; i<nxy_; ++i) { // i symbolizes loop over local kx
@@ -310,33 +316,42 @@ void FullSave_Load::LoadSolution_forRestart(solution *sol, Inputs &SP){
     for (int nV=0; nV<nMF_; ++nV) {
         *sol->pMF(nV) = MF_write_buff_.segment(nV*nz_, nz_).cast<dcmplx>() ;
     }
+    mpi_->print1("Done loading solution\n");
     //////////////////////////////////////
 
     //////////////////////////////////////
-    // kx, ky array
+    // kx array
     // This is done very badly! But, probably a small portion of total time (CHECK THIS!)
     dsetname_.str("");
     dsetname_ << fsave_name<< "/kx";
-    kx_dset = H5Dopen2(fsave_grp, dsetname_.str().c_str(), H5P_DEFAULT);
-    // Read from file
-    if (mpi_->my_n_v() == 0)
-        H5Dread(kx_dset, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, kxbuff_ );
-    
-    // Copy to other procs
-    mpi_->ScatterFromNode0_float(kxbuff_, kbuff_, nxy_);
-    // These copies could also be removed using derived mpi type!
-    for (int j=0; j<nxy_; ++j)
-         K_->kx[j] = dcmplx(0,kbuff_[j] - q_*SP.t_start*K_->ky[j].imag() );
-    
+    htri_t kxexist = H5Lexists( fsave_grp, "kx", H5P_DEFAULT );
+    if (kxexist) {
+        kx_dset = H5Dopen2(fsave_grp, dsetname_.str().c_str(), H5P_DEFAULT);
+        // Read from file
+        if (mpi_->my_n_v() == 0)
+            H5Dread(kx_dset, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, kxbuff_ );
+        
+        // Copy to other procs
+        mpi_->ScatterFromNode0_float(kxbuff_, kbuff_, nxy_);
+        // These copies could also be removed using derived mpi type!
+        for (int j=0; j<nxy_; ++j)
+             K_->kx[j] = dcmplx(0,kbuff_[j] - q_*SP.t_start*K_->ky[j].imag() );
+        H5Dclose(kx_dset);
+    } else {
+        mpi_->print1("No kx data found, proceding using kx as initialized\n");
+    }
     //////////////////////////////////////
 
     // Close up
     for (int jj=0; jj<nxy_full_; ++jj)
         H5Dclose(lin_dset[jj]);
     H5Dclose(MF_dset);
-    H5Dclose(kx_dset);
+    
     
     H5Gclose(fsave_grp);
+    
+    // Timing
+    clk_diff_ += (clock() - clk_start_ )/ (double)CLOCKS_PER_SEC;
     
 }
 

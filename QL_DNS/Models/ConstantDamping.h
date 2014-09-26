@@ -53,6 +53,9 @@ public:
     void Calc_Energy_AM_Diss(TimeVariables& tv, double t, const solution* sol);
     //////////////////////////////////////////////////////////////////
     
+    //////////////////////////
+    // CFL number
+    double Calculate_CFL() const ;
     
 private:
     const std::string equations_name; // Name of model

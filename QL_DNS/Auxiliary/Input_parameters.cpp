@@ -140,6 +140,10 @@ void Inputs::initialize_() {
         fullsol_save_Q = 0;
     }
     fullsol_save_nsteps = round(fullsol_save_interval/dt);
+    // Stop it seg faulting if timevar dt < dt
+    if (timvar_save_interval < dt) {
+        timvar_save_interval = dt;
+    }
     
     fullsave_t = 0.0;
     timevar_t = 0.0;

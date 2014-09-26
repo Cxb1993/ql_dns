@@ -53,6 +53,7 @@ model_(mod)
         linearOp_MF_NLCo_[i] = dt_/(1.0-dt_/2*linearOp_MF_[i]);
         linearOp_MF_LinCo_[i] = (1.0+dt_/2*linearOp_MF_[i])/(1.0-dt_/2*linearOp_MF_[i]);
     }
+
     delete[] linearOp_MF_;
 }
 

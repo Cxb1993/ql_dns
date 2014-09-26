@@ -90,6 +90,11 @@ public:
     //////  AUXILIARY FUNCTIONS OPERATING ON SOLUTION   //////////////
     virtual void Calc_Energy_AM_Diss(TimeVariables& tv, double t, const solution *sol) = 0;
     //////////////////////////////////////////////////////////////////
+    
+    ///////////////////////////////////////////////////
+    // CFL condition - returns CFL number (e.g., kmax*By+q)
+    virtual double Calculate_CFL() const = 0;
+    ///////////////////////////////////////////////////
 
 protected:
     

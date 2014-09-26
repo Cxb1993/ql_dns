@@ -18,6 +18,8 @@ public:
     ~EulerCN();
     // Step
     double Step(double t, solution * sol);
+    // Average time step
+    double mean_time_step() const {return dt_;};
     
 private:
     // Time-step

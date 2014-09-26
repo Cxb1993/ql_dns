@@ -53,6 +53,10 @@ public:
     void Calc_Energy_AM_Diss(TimeVariables& tv, double t, const solution* sol);
     //////////////////////////////////////////////////////////////////
     
+    //////////////////////////
+    // CFL number
+    double Calculate_CFL() const;
+    double kmax;
     
 private:
     const std::string equations_name; // Name of model
@@ -88,7 +92,10 @@ private:
     
     // Reynolds stresses
     dcmplxVec bzux_m_uzbx_c_,bzuy_m_uzby_c_;
-    doubVec bzux_m_uzbx_d_, bzuy_m_uzby_d_, reynolds_stress_MPI_send_, reynolds_stress_MPI_receive_;
+    dcmplxVec reynolds_z_tmp_;// Temporary, size NZfull()
+    dcmplxVec reynolds_stress_MPI_send_, reynolds_stress_MPI_receive_;
+    int num_to_mpi_send_; // Number of terms to send for Reynolds stress per MF variable
+    double reynolds_stress_ft_fac; // 1/(nx*ny)^2
     
     ////////////////////////////////////////////////////
     //               TEMPORARY VARIABLES              //

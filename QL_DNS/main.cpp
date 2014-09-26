@@ -65,7 +65,7 @@ int main(int argc, char ** argv)
     solution *sol = new solution( fluidEqs );
     
     // Initial condtions
-    sol->Initial_Conditions(fft);
+    sol->Initial_Conditions(SP,fft);
     
     // Set up dump saving class (HDF5)
     FullSave_Load *sol_save = new FullSave_Load(SP, &mpi, fluidEqs); // NB: have to make this a pointer so it can be deleted before MPI_Finalize
@@ -91,7 +91,8 @@ int main(int argc, char ** argv)
         
         // Update solution and drive with noise
         dt = integrator->Step(t, sol);
-        fluidEqs->DrivingNoise(t,dt,sol);
+        if (SP.f_noise != 0.0)
+            fluidEqs->DrivingNoise(t,dt,sol);
         
         // Update times
         t += dt;
@@ -117,12 +118,14 @@ int main(int argc, char ** argv)
             SP.fullsave_t -= SP.fullsol_save_interval;
         }
     }
+    fluidEqs->Calc_Energy_AM_Diss(time_vars, t, sol);
     
     // Timing
     diff = (clock() - start ) / (double)CLOCKS_PER_SEC;
     std::stringstream time_str;
-    time_str <<"Full time "<< diff << "s" << std::endl << "IO time " << sol_save->IOtime() << "s" <<std::endl;
+    time_str << "Finished calculation with average time-step " << integrator->mean_time_step() << std::endl << "Full time "<< diff << "s:" << " IO time " << sol_save->IOtime() << "s" <<std::endl;
     mpi.print1( time_str.str() );
+    
 
     
         

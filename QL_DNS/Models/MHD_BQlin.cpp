@@ -47,16 +47,25 @@ fft_(fft) // FFT data
     totalN2_ = totalN2_*totalN2_; // Squared
     mult_noise_fac_ = 1.0/(16*32*32); // Defined so that consistent with (16, 32, 32) results
     mult_noise_fac_ = mult_noise_fac_*mult_noise_fac_;
-    
+    reynolds_stress_ft_fac = 1.0/(N(1)*N(0))/(N(1)*N(0));
     
     // Reynolds stresses
     bzux_m_uzbx_c_ = dcmplxVec::Zero(NZ());
     bzuy_m_uzby_c_ = dcmplxVec::Zero(NZ());
-    bzux_m_uzbx_d_ = doubVec::Zero(NZ());
-    bzuy_m_uzby_d_ = doubVec::Zero(NZ());
+    reynolds_z_tmp_ = dcmplxVec::Zero(NZfull());
     // Send/receive buffers for MPI, for some reason MPI::IN_PLACE is not giving the correct result!
-    reynolds_stress_MPI_send_ = doubVec::Zero(num_MFs()*NZ());
-    reynolds_stress_MPI_receive_ = doubVec::Zero(num_MFs()*NZ());
+    num_to_mpi_send_ = (NZ()-1)/2+1; // Send only half of dealiased, fourier transformed reynolds stress (since it must be symmetric)
+    reynolds_stress_MPI_send_ = dcmplxVec::Zero(num_MFs()*num_to_mpi_send_);
+    reynolds_stress_MPI_receive_ = dcmplxVec::Zero(num_MFs()*num_to_mpi_send_);
+    
+    
+    // CFL calculation
+    kmax = 0;
+    double dealiasfac[3] = {2.0, 2.0,3.0};
+    for (int i=0; i<3; ++i) {
+        if (kmax < 2*PI/L(i)*(N(i)/dealiasfac[i]))
+            kmax = 2*PI/L(i)*(N(i)/dealiasfac[i]);
+    }
     
     
     ////////////////////////////////////////////////////
@@ -111,11 +120,7 @@ void MHD_BQlin::rhs(const double t, const double dt_lin,
     fft_.inverse( &uy_, &dzdzBy_);
     
     // Reynolds stresses -- added to at each step in the loop
-    bzux_m_uzbx_d_.setZero();
-    bzuy_m_uzby_d_.setZero();
-    
-    uy_ = (*SolIn->pMF(1))*fft_.fac1D();
-    fft_.inverse( &uy_, &By_);
+    reynolds_stress_MPI_send_.setZero();
 
     
     /////////////////////////////////////
@@ -123,7 +128,7 @@ void MHD_BQlin::rhs(const double t, const double dt_lin,
     for (int i=0; i<Dimxy(); ++i) {
         // Full Loop containing all the main work equation
         ///////////////////////////////////////
-        ///// MAIN EQUATIONS
+        ///// MAIN LINEAR EQUATIONS
         
         assign_laplacians_(i, t, 1); // Assign kx, lapF etc.
         
@@ -187,13 +192,47 @@ void MHD_BQlin::rhs(const double t, const double dt_lin,
         // Inverse
         fft_.forward(&tmp1_z_, SolOut->pLin(i, 3));
         *SolOut->pLin(i, 3) -= q_*K->kz*(*SolIn->pLin(i, 2));
-        
+        ///// END - MAIN LINEAR EQUATIONS
+        ///////////////////////////////////////
 
-//        for (int vn=0; vn<num_Lin(); ++vn) {
-//            cout << SolOut->pLin(i, vn)->transpose() << endl;
-//        }
-//        cout << endl;
+        ///////////////////////////////////////
+        ///// REYNOLDS STRESS
+        // Chagned a little from other versions (MRIDSS)
+        // Here, calculate all FFTs before doing MPI all reduce (and also multiply by necessary factors and kz to take derivative). This allows only half of the dealiased vector to be send (at the expense of more ffts, reducing the communication load
         
+        // mult_fac for sum - since no -ve ky values are used, count everything but ky=0 twice
+        double mult_fac = 2.0;
+        if (kytmp_== 0.0 )
+            mult_fac = 1.0; // Only count ky=0 mode once
+        
+        double ftfac = mult_fac*fft_.fac1D()*fft_.fac1D()*reynolds_stress_ft_fac; // NZ factor for ifft is included here, so is factor for summing all modes (1/(nx*ny)^2
+        
+        // Keep a running sum
+        fft_.inverse(&uz_, &tmp1_z_); // Keep this for both bzux and bzuy
+        fft_.inverse(&bz_, &tmp2_z_); // Keep this for both bzux and bzuy
+        
+        // bz*ux-uz*bx
+        fft_.inverse(SolIn->pLin(i, 0), &tmp3_z_);
+        reynolds_z_tmp_ = (tmp2_z_*tmp3_z_.conjugate()).real().cast<dcmplx>();
+        fft_.inverse(SolIn->pLin(i, 2), &tmp3_z_);
+        reynolds_z_tmp_ -= (tmp1_z_*tmp3_z_.conjugate()).real().cast<dcmplx>();
+        // Back to real space
+        fft_.forward(&reynolds_z_tmp_, &tmp1_k_);
+        // Add on to MPI send vector
+        reynolds_stress_MPI_send_.segment(0, num_to_mpi_send_) += ftfac*(K->kz*tmp1_k_).segment(0, num_to_mpi_send_);
+        
+        // bz*uy-uz*by
+        fft_.inverse(&uy_, &tmp3_z_);
+        reynolds_z_tmp_ = (tmp2_z_*tmp3_z_.conjugate()).real().cast<dcmplx>();
+        fft_.inverse(&by_, &tmp3_z_);
+        reynolds_z_tmp_ -= (tmp1_z_*tmp3_z_.conjugate()).real().cast<dcmplx>();
+        // Back to real space
+        fft_.forward(&reynolds_z_tmp_, &tmp1_k_);
+        // Add on to MPI send vector
+        reynolds_stress_MPI_send_.segment(num_to_mpi_send_, num_to_mpi_send_) += ftfac*(K->kz*tmp1_k_).segment(0, num_to_mpi_send_);
+        ///// END - REYNOLDS STRESS
+        ///////////////////////////////////////
+
         
         ////////////////////////////////////////
         //////   LINEAR PART
@@ -208,9 +247,29 @@ void MHD_BQlin::rhs(const double t, const double dt_lin,
         
         
     }
-    for (int i=0; i<num_MFs(); ++i) {
-         SolOut->pMF(i)->setZero();
+    //////////////////////////////////////
+    // Reynolds stress
+    // Sum accross all processes
+    mpi_.SumAllReduce_dcmplx(reynolds_stress_MPI_send_.data(), reynolds_stress_MPI_receive_.data(), num_Lin()*num_to_mpi_send_);
+    // Put into variables for MF update - flip to ensure realty
+    bzux_m_uzbx_c_.segment(0, num_to_mpi_send_) = reynolds_stress_MPI_receive_.segment(0, num_to_mpi_send_);
+    bzux_m_uzbx_c_.segment(num_to_mpi_send_,num_to_mpi_send_-1) = reynolds_stress_MPI_receive_.segment(1, num_to_mpi_send_-1).reverse().conjugate();
+    bzuy_m_uzby_c_.segment(0, num_to_mpi_send_) = reynolds_stress_MPI_receive_.segment(num_to_mpi_send_, num_to_mpi_send_);
+    bzuy_m_uzby_c_.segment(num_to_mpi_send_,num_to_mpi_send_-1) = reynolds_stress_MPI_receive_.segment(num_to_mpi_send_+1, num_to_mpi_send_-1).reverse().conjugate();
+    // Reynolds stress
+    //////////////////////////////////////
+
+    
+    //////////////////////////////////////
+    ////   MEAN FIELDS    ////////////////
+    if (QL_YN_) {
+        *SolOut->pMF(1) = -q_*(*SolIn->pMF(0)) + bzuy_m_uzby_c_;
+        *SolOut->pMF(0) = bzux_m_uzbx_c_;
+    } else { // Still calculate Reynolds stress in linear calculation
+        SolOut->pMF(1)->setZero();
+        SolOut->pMF(0)->setZero();
     }
+
     
     
 }
@@ -226,9 +285,15 @@ void MHD_BQlin::linearOPs_Init(double t0, doubVec **linOpFluct, doubVec *linOpMF
         linOpFluct[i][3] = linOpFluct[i][2];
     }
     // Mean fields
-    for (int i=0; i<num_MFs(); ++i) {
-        linOpMF[i]=eta_*K->kz2;
+    if (QL_YN_) {
+        linOpMF[0]=eta_*K->kz2;
+        linOpMF[1]=eta_*K->kz2;
+    } else {
+        linOpMF[0].setZero();
+        linOpMF[1].setZero();
     }
+    
+
 }
 
 
@@ -343,7 +408,7 @@ void MHD_BQlin::Calc_Energy_AM_Diss(TimeVariables& tv, double t, const solution 
         double AM_MU =0, AM_MB=0;
         double diss_MU =0, diss_MB =0;
         
-        energy_MB = ( (*(sol->pMF(0))).abs2().sum() + (*(sol->pMF(1))).abs2().sum() )/( NZ()*NZ() );
+        energy_MB = ( (*(sol->pMF(0))).abs2().sum() + (*(sol->pMF(1))).abs2().sum() )/( NZfull()*NZfull() );
         
         
         AM_MB = 0;
@@ -386,21 +451,6 @@ void MHD_BQlin::Calc_Energy_AM_Diss(TimeVariables& tv, double t, const solution 
 }
 
 
-
-////////////////////////////////////////////////////////////
-////   DEALIASING
-////1-D version - takes a dcmplxVec input
-//void MHD_BQlin::dealias(dcmplxVec& vec) {
-//    vec.segment(dealiasBnds_[1], dealiasBnds_[0]).setZero();
-//}
-//
-////1-D version - takes a doubVec input
-//void MHD_BQlin::dealias(doubVec& vec) {
-//    vec.segment(dealiasBnds_[1], dealiasBnds_[0]).setZero();
-//}
-
-
-
 //////////////////////////////////////////////////////////
 //   AUXILIARY FUNCTIONS
 inline void MHD_BQlin::assign_laplacians_(int i, double t, bool need_inverse){
@@ -422,6 +472,18 @@ inline void MHD_BQlin::assign_laplacians_(int i, double t, bool need_inverse){
 }
 //////////////////////////////////////////////////////////
 
+
+
+//////////////////////////
+// CFL number
+double MHD_BQlin::Calculate_CFL() const {
+// Returns CFL/dt to calculate dt - in this case CFL/dt = kmax By + q
+    
+    // By has been previously calculated, so may as well use it
+    double Bymax = sqrt(By_.abs2().maxCoeff());
+    return kmax*Bymax + q_;
+    
+}
 
 
 

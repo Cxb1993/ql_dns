@@ -17,11 +17,13 @@ nxy_(mod->Dimxy()), nz_(mod->NZ()),
 nMF_(mod->num_MFs()),nLin_(mod->num_Lin()),
 model_(mod),
 a0_(8.0/15.0),a1_(5.0/12.0),a2_(3.0/4.0),b1_(-17.0/60.0),b2_(-5.0/12.0),
-p1_(8.0/15.0),p2_(2.0/3.0)// Integrator parameters
+p1_(8.0/15.0),p2_(2.0/3.0),// Integrator parameters
+step_count_(0), dt_mean_(0.0)
 {
     if (SP.dt < 0 ){
         variable_dt_ = 1;
         CFLnum_ = SP.CFL;
+        dtmax_ = -SP.dt;
     } else {
         dt_ = SP.dt;
         variable_dt_ = 0;
@@ -74,6 +76,16 @@ RK3CN::~RK3CN() {
 // Step forward in time
 double RK3CN::Step(double t, solution * sol){
     
+    if (variable_dt_) {
+        dt_ = CFLnum_/model_->Calculate_CFL();
+        if (dt_ > dtmax_)
+            dt_ = dtmax_;
+        
+    }
+    dt_mean_ += dt_;
+    ++step_count_;
+    
+    
     // Still not SURE linear part is correct on this, should check...
     //////////////////////////////////////////////////////
     //   STEP 1
@@ -90,7 +102,7 @@ double RK3CN::Step(double t, solution * sol){
     for (int i=0; i<nxy_; ++i) {// Loop over kx ky
         
         for (int j=0; j<nLin_; ++j){ // Loop over variables
-            denom = 1/(1-linC_*linearOp_fluct_[i][j]);
+            denom = 1.0/(1.0-linC_*linearOp_fluct_[i][j]);
             // Probably faster to do inside Eigen for vectorization
             (*(sol->pLin(i,j))) = NLC1_*denom*(*(sol_rhs_->pLin(i,j))) + (1+linC_*linearOp_fluct_old_[i][j])*denom*(*(sol->pLin(i,j)));
         }
@@ -98,8 +110,8 @@ double RK3CN::Step(double t, solution * sol){
     
     // Mean fields
     for (int i=0; i<nMF_; ++i) {
-        denom = 1/(1-linC_*linearOp_MF_[i]);
-        (*sol->pMF(i)) = NLC1_*denom*(*sol_rhs_->pMF(i)) + (1+linC_*linearOp_MF_[i])*(*sol->pMF(i));
+        denom = 1.0/(1.0-linC_*linearOp_MF_[i]);
+        (*sol->pMF(i)) = NLC1_*denom*(*sol_rhs_->pMF(i)) + (1+linC_*linearOp_MF_[i])*denom*(*sol->pMF(i));
     }
 
     
@@ -126,7 +138,7 @@ double RK3CN::Step(double t, solution * sol){
     for (int i=0; i<nxy_; ++i) {// Loop over kx ky
         
         for (int j=0; j<nLin_; ++j){ // Loop over variables
-            denom = 1/(1-linC_*linearOp_fluct_[i][j]);
+            denom = 1.0/(1.0-linC_*linearOp_fluct_[i][j]);
             // Probably faster to do inside Eigen for vectorization
             (*(sol->pLin(i,j))) = NLC1_*denom*(*(sol_rhs2_->pLin(i,j))) + NLC2_*denom*(*(sol_rhs_->pLin(i,j))) + (1+linC_*linearOp_fluct_old_[i][j])*denom*(*(sol->pLin(i,j)));
         }
@@ -134,8 +146,8 @@ double RK3CN::Step(double t, solution * sol){
     
     // Mean fields
     for (int i=0; i<nMF_; ++i) {
-        denom = 1/(1-linC_*linearOp_MF_[i]);
-        (*sol->pMF(i)) = NLC1_*denom*(*sol_rhs2_->pMF(i)) + NLC2_*denom*(*sol_rhs_->pMF(i)) + (1+linC_*linearOp_MF_[i])*(*sol->pMF(i));
+        denom = 1.0/(1.0-linC_*linearOp_MF_[i]);
+        (*sol->pMF(i)) = NLC1_*denom*(*sol_rhs2_->pMF(i)) + NLC2_*denom*(*sol_rhs_->pMF(i)) + (1+linC_*linearOp_MF_[i])*denom*(*sol->pMF(i));
     }
     
     // Move variables around
@@ -162,7 +174,7 @@ double RK3CN::Step(double t, solution * sol){
     for (int i=0; i<nxy_; ++i) {// Loop over kx ky
         
         for (int j=0; j<nLin_; ++j){ // Loop over variables
-            denom = 1/(1-linC_*linearOp_fluct_[i][j]);
+            denom = 1.0/(1.0-linC_*linearOp_fluct_[i][j]);
             // Probably faster to do inside Eigen for vectorization
             (*(sol->pLin(i,j))) = NLC1_*denom*(*(sol_rhs_->pLin(i,j))) + NLC2_*denom*(*(sol_rhs2_->pLin(i,j))) + (1+linC_*linearOp_fluct_old_[i][j])*denom*(*(sol->pLin(i,j)));
         }
@@ -170,8 +182,8 @@ double RK3CN::Step(double t, solution * sol){
     
     // Mean fields
     for (int i=0; i<nMF_; ++i) {
-        denom = 1/(1-linC_*linearOp_MF_[i]);
-        (*sol->pMF(i)) = NLC1_*denom*(*sol_rhs_->pMF(i)) + NLC2_*denom*(*sol_rhs2_->pMF(i)) + (1+linC_*linearOp_MF_[i])*(*sol->pMF(i));
+        denom = 1.0/(1.0-linC_*linearOp_MF_[i]);
+        (*sol->pMF(i)) = NLC1_*denom*(*sol_rhs_->pMF(i)) + NLC2_*denom*(*sol_rhs2_->pMF(i)) + (1+linC_*linearOp_MF_[i])*denom*(*sol->pMF(i));
     }
     
     // Move variables around

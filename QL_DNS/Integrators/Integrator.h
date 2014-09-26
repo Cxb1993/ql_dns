@@ -23,6 +23,8 @@ public:
     virtual double Step(double t, solution * sol) = 0;
     // Reinitialize linear operators (these are stored in integrator)
 //    virtual void Reinitialize_linear_Ops(double t) = 0;
+    // Return the mean time-step (just for printing)
+    virtual double mean_time_step() const = 0;
 };
 
 

@@ -105,21 +105,12 @@ void MPIdata::SumReduce_IP_doub(double* in_p, int size) {
     
 }
 
-// Sum AllReduce double
-void MPIdata::SumAllReduce_IP_double(double* in_p, int size) {
-    // MPI_AllReduce wrapper for data of type double - convenient for multiple reasons
-    // This one is in-place
-#ifdef USE_MPI_FLAG
-    MPI::COMM_WORLD.Allreduce(MPI::IN_PLACE, in_p, size, MPI::DOUBLE, MPI::SUM);
-#endif
-}
 
-// Sum AllReduce double
-void MPIdata::SumAllReduce_double(double* in_p, double *out_p, int size) {
-    // MPI_AllReduce wrapper for data of type double - convenient for multiple reasons
-    // This one is in-place
+// Sum AllReduce dcmplx
+void MPIdata::SumAllReduce_dcmplx(dcmplx* in_p, dcmplx *out_p, int size) {
+    // MPI_AllReduce wrapper for data of type dcmplx - convenient for multiple reasons
 #ifdef USE_MPI_FLAG
-    MPI::COMM_WORLD.Allreduce( in_p, out_p, size, MPI::DOUBLE, MPI::SUM);
+    MPI::COMM_WORLD.Allreduce( in_p, out_p, size, MPI::DOUBLE_COMPLEX, MPI::SUM);
 #else
     for (int i=0; i<size; ++i) {
         out_p[i] = in_p[i];
@@ -172,7 +163,7 @@ void MPIdata::ScatterFromNode0_float(float *in_p, float *rec_p, int size_rec_p){
     MPI_Scatter(in_p, size_rec_p, MPI_FLOAT,rec_p, size_rec_p*total_n_v(), MPI_FLOAT, 0,MPI_COMM_WORLD);
 #else
     // Copy in_p to rec_p
-    for (int i=0; i<size_on_all_proc; ++i) {
+    for (int i=0; i<size_rec_p; ++i) {
         rec_p[i] = in_p[i];
     }
 #endif

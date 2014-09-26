@@ -266,6 +266,18 @@ void ConstantDamping::Calc_Energy_AM_Diss(TimeVariables& tv, double t, const sol
 }
 
 
+//////////////////////////
+// CFL number
+double ConstantDamping::Calculate_CFL() const {
+    // Returns CFL/dt to calculate dt - in this case don't know
+    
+    // Pointlessly simple
+    return dampFac*4;
+    
+}
+
+
+
 //////////////////////////////////////////////////////////
 //   AUXILIARY FUNCTIONS
 inline void ConstantDamping::assign_laplacians_(int i, double t, bool need_inverse){

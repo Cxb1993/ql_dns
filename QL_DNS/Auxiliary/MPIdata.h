@@ -46,8 +46,7 @@ public:
     // MPI reduce functions
     void SumReduce_doub(double* in_p, double* out_p, int size);// Sum double values
     void SumReduce_IP_doub(double* in_p, int size);// Sum double values
-    void SumAllReduce_IP_double(double* in_p, int size); //Sum double, in place
-    void SumAllReduce_double(double* in_p, double*out_p, int size);//Sum double,
+    void SumAllReduce_dcmplx(dcmplx* in_p, dcmplx*out_p, int size);//Sum double,
     
     // Send and receive for noise
     void Send_dcmplx(dcmplx* s_buff, int count, int dest, int tag);
