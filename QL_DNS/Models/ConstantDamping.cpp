@@ -140,7 +140,7 @@ void ConstantDamping::ShearingBox_Remap(double qt, solution *sol){
 
 //////////////////////////////////////////////////////////
 //    ENERGY/MOMENTUM ETC.
-void ConstantDamping::Calc_Energy_AM_Diss(TimeVariables& tv, double t, const solution *sol) {
+void ConstantDamping::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const solution *sol) {
     // Energy, angular momentum and dissipation of the solution MFin and Cin
     // TimeVariables class stores info and data about energy, AM etc.
     // t is time
@@ -170,7 +170,7 @@ void ConstantDamping::Calc_Energy_AM_Diss(TimeVariables& tv, double t, const sol
         if (kytmp_== 0.0 )
             mult_fac = 1; // Only count ky=0 mode once
         
-        if (tv.energy_save_Q()){
+        if (tv->energy_save_Q()){
             //////////////////////////////////////
             //     ENERGY
             // Use Qkl_tmp_ for Mkl to save memory
@@ -181,13 +181,13 @@ void ConstantDamping::Calc_Energy_AM_Diss(TimeVariables& tv, double t, const sol
             energy_b += mult_fac*(  lap2tmp_*(( *(sol->pLin(i,2)) ).abs2()) - ilap2tmp_*(( *(sol->pLin(i,3)) ).abs2())  ).sum();
             //////////////////////////////////////
         }
-        if (tv.AngMom_save_Q()){
+        if (tv->AngMom_save_Q()){
             //////////////////////////////////////
             //   Angular momentum
             //
             //////////////////////////////////////
         }
-        if (tv.dissip_save_Q()){
+        if (tv->dissip_save_Q()){
             //////////////////////////////////////
             //     DISSIPATION
             //
@@ -236,21 +236,21 @@ void ConstantDamping::Calc_Energy_AM_Diss(TimeVariables& tv, double t, const sol
         //////         OUTPUT            //////
         
         // Energy
-        double* en_point = tv.current_energy();
+        double* en_point = tv->current_energy();
         en_point[0] = energy_MU/2;
         en_point[1] = energy_MB/2;
         en_point[2] = energy_u/2;
         en_point[3] = energy_b/2;
         
         // Angular momentum
-        double* AM_point = tv.current_AM();
+        double* AM_point = tv->current_AM();
         AM_point[0] = AM_MU;
         AM_point[1] = AM_MB;
         AM_point[2] = AM_u;
         AM_point[3] = AM_b;
         
         // Energy
-        double* diss_point = tv.current_diss();
+        double* diss_point = tv->current_diss();
         diss_point[0] = diss_MU;
         diss_point[1] = diss_MB;
         diss_point[2] = diss_u;
@@ -261,7 +261,7 @@ void ConstantDamping::Calc_Energy_AM_Diss(TimeVariables& tv, double t, const sol
     }
     
     // Save the data
-    tv.Save_Data(t);
+    tv->Save_Data(t);
     
 }
 

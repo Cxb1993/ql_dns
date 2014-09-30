@@ -37,9 +37,6 @@ private:
     doubVec **linearOp_fluct_,**linearOp_fluct_old_;
     doubVec *linearOp_MF_NLCo_,*linearOp_MF_LinCo_;
     
-    // Pointer variables for evaluation - not very clean but couldn't think of a better way!
-    dcmplx *dLin_,*dLin_rhs_;
-    double *lin_op_, *lin_op_old_;
     doubVec denom;
 };
 

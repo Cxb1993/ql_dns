@@ -37,7 +37,7 @@ fft_(fft) // FFT data
     
     
     // Random generator
-    mt_ = boost::random::mt19937(clock()/((double) CLOCKS_PER_SEC) + mpi_.my_n_v());  // Seed is from time
+    mt_ = boost::random::mt19937( static_cast<unsigned int>(clock()+mpi_.my_n_v()) );  // Seed is from time
     ndist_ = boost::random::normal_distribution<double>(0,f_noise_/2); // Normal distribution, standard deviation f_noise_ (factor 2 is since it's complex)
     noise_buff_len_ = NZ()-1;
     noise_buff_ = dcmplxVec(num_Lin()*noise_buff_len_);// NZ()-1 since ky=kz=0 mode is not driven
@@ -250,7 +250,8 @@ void MHD_BQlin::rhs(const double t, const double dt_lin,
     //////////////////////////////////////
     // Reynolds stress
     // Sum accross all processes
-    mpi_.SumAllReduce_dcmplx(reynolds_stress_MPI_send_.data(), reynolds_stress_MPI_receive_.data(), num_Lin()*num_to_mpi_send_);
+
+    mpi_.SumAllReduce_dcmplx(reynolds_stress_MPI_send_.data(), reynolds_stress_MPI_receive_.data(), num_MFs()*num_to_mpi_send_);
     // Put into variables for MF update - flip to ensure realty
     bzux_m_uzbx_c_.segment(0, num_to_mpi_send_) = reynolds_stress_MPI_receive_.segment(0, num_to_mpi_send_);
     bzux_m_uzbx_c_.segment(num_to_mpi_send_,num_to_mpi_send_-1) = reynolds_stress_MPI_receive_.segment(1, num_to_mpi_send_-1).reverse().conjugate();
@@ -325,13 +326,17 @@ void MHD_BQlin::ShearingBox_Remap(double qt, solution *sol){
 
 //////////////////////////////////////////////////////////
 //    ENERGY/MOMENTUM ETC.
-void MHD_BQlin::Calc_Energy_AM_Diss(TimeVariables& tv, double t, const solution *sol) {
+void MHD_BQlin::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const solution *sol) {
     // Energy, angular momentum and dissipation of the solution MFin and Cin
     // TimeVariables class stores info and data about energy, AM etc.
     // t is time
     
     // OUTPUT: energy[1] and [2] contain U and B mean field energies (energy[1]=0 for this)
     // energy[3] and [4] contain u and b fluctuating energies.
+    
+    //////////////////////////////////////////
+    //    Can add more timevar outputs here
+    //    Add to parallel loop below and update num_to_mpi
     
     // Energy
     double energy_u=0, energy_b=0;
@@ -355,26 +360,35 @@ void MHD_BQlin::Calc_Energy_AM_Diss(TimeVariables& tv, double t, const solution 
         if (kytmp_== 0.0 )
             mult_fac = 1; // Only count ky=0 mode once
         
-        if (tv.energy_save_Q()){
+        lap2tmp_ = lapFtmp_*ilap2tmp_; // lap2tmp_ just a convenient storage
+        
+        if (tv->energy_save_Q()){
             //////////////////////////////////////
             //     ENERGY
-            // Use Qkl_tmp_ for Mkl to save memory
-            lap2tmp_ = lapFtmp_*ilap2tmp_; // lap2tmp_ just a convenient storage
             
             // (NB: ilap2tmp_ is negative but want abs, just use -ilap2)
             energy_u += mult_fac*(  lap2tmp_*( *(sol->pLin(i,0)) ).abs2() - ilap2tmp_*( *(sol->pLin(i,1)) ).abs2()  ).sum();
             energy_b += mult_fac*(  lap2tmp_*( *(sol->pLin(i,2)) ).abs2() - ilap2tmp_*( *(sol->pLin(i,3)) ).abs2()  ).sum();
             //////////////////////////////////////
         }
-        if (tv.AngMom_save_Q()){
+        if (tv->AngMom_save_Q()){
             //////////////////////////////////////
             //   Angular momentum
+            
+            uy_ = ( (-kyctmp_*kxctmp_)*(*sol->pLin(i, 0)) +  K->kz*(*sol->pLin(i, 1)) )*ilap2tmp_;
+            by_ = ( (-kyctmp_*kxctmp_)*(*sol->pLin(i, 2)) +  K->kz*(*sol->pLin(i, 3)) )*ilap2tmp_;
+            
+            AM_u += ( (*sol->pLin(i, 0))*uy_.conjugate() ).real().sum();
+            AM_b += ( (*sol->pLin(i, 2))*by_.conjugate() ).real().sum();
             //
             //////////////////////////////////////
         }
-        if (tv.dissip_save_Q()){
+        if (tv->dissip_save_Q()){
             //////////////////////////////////////
             //     DISSIPATION
+            // (NB: ilap2tmp_ and lapFtmp_ are negative but want abs, just use negative)
+            diss_u += (mult_fac*nu_)*(  -lapFtmp_*( lap2tmp_*( *(sol->pLin(i,0)) ).abs2() - ilap2tmp_*( *(sol->pLin(i,1)) ).abs2() ) ).sum();
+            diss_b += (mult_fac*eta_)*(  -lapFtmp_*( lap2tmp_*( *(sol->pLin(i,2)) ).abs2() - ilap2tmp_*( *(sol->pLin(i,3)) ).abs2() ) ).sum();
             //
             //////////////////////////////////////
         }
@@ -393,6 +407,7 @@ void MHD_BQlin::Calc_Energy_AM_Diss(TimeVariables& tv, double t, const solution 
         ////////////////////////////////////////////
         ///// All this is only on processor 0  /////
         double divfac=1.0/totalN2_;
+        double divfavMF = 1.0/( NZfull()*NZfull() );
         energy_u = mpi_receive_buff[0]*divfac;
         energy_b = mpi_receive_buff[1]*divfac;
         AM_u = mpi_receive_buff[2]*divfac;
@@ -408,34 +423,32 @@ void MHD_BQlin::Calc_Energy_AM_Diss(TimeVariables& tv, double t, const solution 
         double AM_MU =0, AM_MB=0;
         double diss_MU =0, diss_MB =0;
         
-        energy_MB = ( (*(sol->pMF(0))).abs2().sum() + (*(sol->pMF(1))).abs2().sum() )/( NZfull()*NZfull() );
+        energy_MB = ( (*(sol->pMF(0))).abs2().sum() + (*(sol->pMF(1))).abs2().sum() )*divfavMF;
         
+        AM_MB = divfavMF*( (*sol->pMF(0))*(sol->pMF(1)->conjugate()) ).real().sum();
         
-        AM_MB = 0;
-        AM_MU = 0;
-        
-        diss_MB = 0;
-        diss_MU = 0;
+        diss_MB = (divfavMF*eta_)*( -(K->kz2*sol->pMF(0)->abs2()).sum() - (K->kz2*sol->pMF(1)->abs2()).sum() );
+
         
         ///////////////////////////////////////
         //////         OUTPUT            //////
         
         // Energy
-        double* en_point = tv.current_energy();
+        double* en_point = tv->current_energy();
         en_point[0] = energy_MU/2;
         en_point[1] = energy_MB/2;
         en_point[2] = energy_u/2;
         en_point[3] = energy_b/2;
         
         // Angular momentum
-        double* AM_point = tv.current_AM();
+        double* AM_point = tv->current_AM();
         AM_point[0] = AM_MU;
         AM_point[1] = AM_MB;
         AM_point[2] = AM_u;
         AM_point[3] = AM_b;
         
         // Energy
-        double* diss_point = tv.current_diss();
+        double* diss_point = tv->current_diss();
         diss_point[0] = diss_MU;
         diss_point[1] = diss_MB;
         diss_point[2] = diss_u;
@@ -446,7 +459,7 @@ void MHD_BQlin::Calc_Energy_AM_Diss(TimeVariables& tv, double t, const solution 
     }
     
     // Save the data
-    tv.Save_Data(t);
+    tv->Save_Data(t);
     
 }
 

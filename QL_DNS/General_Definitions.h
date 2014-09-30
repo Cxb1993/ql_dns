@@ -32,6 +32,7 @@
 #include <complex>
 #include <vector>
 #include <boost/random.hpp> // Faster than cpp standard!
+#include <boost/nondet_random.hpp> // May need to change for cluster
 #include <ctime>
 #include <cmath>
 #include <sys/types.h>

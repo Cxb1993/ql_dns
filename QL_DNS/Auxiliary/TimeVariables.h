@@ -15,6 +15,7 @@
 #include "fftwPlans.h"
 
 
+class solution;
 //  Timevar storage, i.e., enregy, angular momentum etc.
 class TimeVariables {
 public:
@@ -44,14 +45,22 @@ public:
     void Save_Data(double t);
     
     // Save mean fields - could improve
-    void Save_Mean_Fields(dcmplxVec *MFdata,  fftwPlans& fft);
+    void Save_Mean_Fields(solution *sol,  fftwPlans& fft);
     
+    // Accumulated time
+    double TVtime() {return clk_diff_;}; // Accumulated time for full saves
     
 private:
     // Basic data
     const int nsteps_;  // Number of saves (length of array)
     const int width_;  // Number of saves for each step in each
     const int numMF_;   // Number of mean fields
+    const int nz_full_;
+    
+    // Timing
+    clock_t clk_start_;
+    double clk_diff_; // Add up timing from all calls to check total is not dominating
+    
     // Reynolds stress
     int num_reynolds_saves_; // Number of saves in Reynolds stress
     
@@ -84,7 +93,6 @@ private:
     std::string fname_mean_fields_;
     dcmplxVec MFdata_c_; // Space for taking fft and converting to real
     doubVec MFdata_d_;
-    long MFlen_; // Set to zero once and change at first save
     
     // Directory
     std::string simulation_dir_;

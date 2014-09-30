@@ -7,7 +7,7 @@
 //
 
 #include "TimeVariables.h"
-
+#include "../solution.h" // Have to include here to stop circular definition problems
 
 
 
@@ -25,10 +25,11 @@ int TimeVariables::curr_pos_ = 0;
 TimeVariables::TimeVariables(Inputs& SP, int ENwidth, int numMF, int num_reynolds, int mpinode) :
 nsteps_(SP.nsteps/SP.timevar_save_nsteps + 1), width_(ENwidth), num_reynolds_saves_(num_reynolds),
 mpi_node_(mpinode),
-simulation_dir_(SP.simulation_dir), MFlen_(0), numMF_(numMF),
+simulation_dir_(SP.simulation_dir), numMF_(numMF),nz_full_(SP.NZ),
 en_save_Q_(SP.energy_save_Q), AM_save_Q_(SP.AM_save_Q), diss_save_Q_(SP.dissipation_save_Q),
 rey_save_Q_(SP.reynolds_save_Q),
-MF_save_Q_(SP.mean_field_save_Q)
+MF_save_Q_(SP.mean_field_save_Q),
+clk_diff_(0.0)// Timing
 {
     ////////////////////////////////
     //    THIS NEEDS TIDYING!!!!!!!!
@@ -43,6 +44,9 @@ MF_save_Q_(SP.mean_field_save_Q)
         dissipation_ = new double[width_];
         reynolds_ = new double[num_reynolds_saves_];
     }
+    // For mean fields
+    MFdata_c_ = dcmplxVec( nz_full_ );
+    MFdata_d_ = doubVec (nz_full_ );
     
     // Saving to disk - TODO improve to save at regular intervals?
     fname_energy_ = simulation_dir_ + "energy.dat";
@@ -54,6 +58,7 @@ MF_save_Q_(SP.mean_field_save_Q)
     fname_mean_fields_ = simulation_dir_ + "mean_fields.dat";
     // Time
     fname_time_ = simulation_dir_ + "time_vec.dat";
+    
     
     std::ios_base::openmode o_mode;
     if (SP.start_from_saved_Q) {
@@ -135,6 +140,9 @@ TimeVariables::~TimeVariables() {
 
 // Save the data to disk
 void TimeVariables::Save_Data(double t){
+    // Start timing
+    clk_start_ = clock();
+    
     // Run only on root process
     if (mpi_node_bool_){
         
@@ -165,36 +173,35 @@ void TimeVariables::Save_Data(double t){
         
     }
     
-    
+    // Timing
+    clk_diff_ += (clock() - clk_start_ )/ (double)CLOCKS_PER_SEC;
     
 }
 
 
 // Save Mean field data
-void TimeVariables::Save_Mean_Fields(dcmplxVec *MF, fftwPlans& fft){
-    // Could certainly be improved - just dumps the data into fname_mean_fields
+void TimeVariables::Save_Mean_Fields(solution *sol, fftwPlans& fft){
+    // Start timing
+    clk_start_ = clock();
     
+    // Could certainly be improved - just dumps the data into fname_mean_fields
     // IN MATLAB
     // Saves MF[i] sequentially from 0 to numMF. Data is double
     
     if ( MF_save_Q_ && mpi_node_bool_ ){
-        // Initialize data
-        if (MFlen_ == 0 ) {
-            MFlen_ = MF[0].size();
-            MFdata_c_ = dcmplxVec( MFlen_);
-            MFdata_d_ = doubVec (MFlen_);
-        }
-        
+ 
         // Save each MF variable sequentially
         for (int i=0; i<numMF_; ++i) {
             // Take fft - could be done faster with c_to_r fft
-            MFdata_c_ = MF[i];
-            fft.back_1D(MFdata_c_.data());
-            MFdata_d_ = MFdata_c_.real()/MFlen_;
+            fft.inverse(sol->pMF(i), &MFdata_c_);
+            MFdata_d_ =fft.fac1D()*MFdata_c_.real();
             //Save
-            fileS_mean_fields_.write( (char*) MFdata_d_.data(), sizeof(double)*MFlen_);
+            fileS_mean_fields_.write( (char*) MFdata_d_.data(), sizeof(double)*nz_full_);
         }
     }
+    
+    // Timing
+    clk_diff_ += (clock() - clk_start_ )/ (double)CLOCKS_PER_SEC;
 }
 //                                                 //
 /////////////////////////////////////////////////////

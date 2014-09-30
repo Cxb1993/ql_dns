@@ -80,7 +80,7 @@ int main(int argc, char ** argv)
     Integrator *integrator = new RK3CN(t, SP, fluidEqs);
     
     // Set up time variables -- energy, engular momentum etc.
-    TimeVariables time_vars(SP, 4, fluidEqs->num_MFs(), 5, mpi.my_n_v());
+    TimeVariables *time_vars = new TimeVariables(SP, 4, fluidEqs->num_MFs(), 5, mpi.my_n_v());
     fluidEqs->Calc_Energy_AM_Diss(time_vars, t, sol); // Save initial conditions
     
     // Main loop
@@ -105,6 +105,7 @@ int main(int argc, char ** argv)
         // Calculate energy, AM, etc.
         if (SP.timevar_t - SP.timvar_save_interval > -1e-8){
             fluidEqs->Calc_Energy_AM_Diss(time_vars, t, sol);
+            time_vars->Save_Mean_Fields(sol,  fft);
             SP.timevar_t -= SP.timvar_save_interval;
         }
     
@@ -118,12 +119,14 @@ int main(int argc, char ** argv)
             SP.fullsave_t -= SP.fullsol_save_interval;
         }
     }
+    // Final energy and mean fields
     fluidEqs->Calc_Energy_AM_Diss(time_vars, t, sol);
+    time_vars->Save_Mean_Fields(sol,  fft);
     
     // Timing
     diff = (clock() - start ) / (double)CLOCKS_PER_SEC;
     std::stringstream time_str;
-    time_str << "Finished calculation with average time-step " << integrator->mean_time_step() << std::endl << "Full time "<< diff << "s:" << " IO time " << sol_save->IOtime() << "s" <<std::endl;
+    time_str << "Finished calculation with average time-step " << integrator->mean_time_step() << std::endl << "Full time "<< diff << "s:" << " IO time " << sol_save->IOtime() << "s: " << "Time variables: " << time_vars->TVtime() << "s" << std::endl;
     mpi.print1( time_str.str() );
     
 
@@ -132,6 +135,7 @@ int main(int argc, char ** argv)
     delete fluidEqs;
     delete sol;
     delete integrator;
+    delete time_vars;
     delete sol_save;
 #ifdef USE_MPI_FLAG
     MPI_Finalize();

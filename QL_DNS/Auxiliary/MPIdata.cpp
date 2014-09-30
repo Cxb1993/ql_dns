@@ -121,7 +121,7 @@ void MPIdata::SumAllReduce_dcmplx(dcmplx* in_p, dcmplx *out_p, int size) {
 // Basic MPI send - complex data
 void MPIdata::Send_dcmplx(dcmplx* s_buff, int count, int dest, int tag){
 #ifdef USE_MPI_FLAG
-    MPI_Send(s_buff, count, MPI_C_DOUBLE_COMPLEX, dest, tag, MPI_COMM_WORLD);
+    MPI_Send(s_buff, count, MPI::DOUBLE_COMPLEX, dest, tag, MPI_COMM_WORLD);
 #else
     print1("SHOULD NOT BE CALLING Send_dcmplx WITHOUT MPI!!!\n");
 #endif
@@ -129,7 +129,7 @@ void MPIdata::Send_dcmplx(dcmplx* s_buff, int count, int dest, int tag){
 // Basic MPI receive - complex data
 void MPIdata::Recv_dcmplx(dcmplx* r_buff, int count, int source, int tag){
 #ifdef USE_MPI_FLAG
-    MPI_Recv(r_buff, count, MPI_C_DOUBLE_COMPLEX, source, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Recv(r_buff, count, MPI::DOUBLE_COMPLEX, source, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 #else
     print1("SHOULD NOT BE CALLING Recv_dcmplx WITHOUT MPI!!!\n");
 #endif

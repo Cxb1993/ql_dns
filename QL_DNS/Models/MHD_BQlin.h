@@ -50,7 +50,7 @@ public:
     
     //////////////////////////////////////////////////////////////////
     //////  AUXILIARY FUNCTIONS OPERATING ON SOLUTION   //////////////
-    void Calc_Energy_AM_Diss(TimeVariables& tv, double t, const solution* sol);
+    void Calc_Energy_AM_Diss(TimeVariables* tv, double t, const solution* sol);
     //////////////////////////////////////////////////////////////////
     
     //////////////////////////

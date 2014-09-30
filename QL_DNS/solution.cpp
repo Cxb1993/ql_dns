@@ -63,18 +63,19 @@ void solution::Initial_Conditions(Inputs &SP,fftwPlans &fft) {
     
     // Decide what MF initial conditions based on SP.initial_By
     // If initial_By>0, only By nonzero, set to lowest kz mode in box
+    int MODE = 1; // Mode for deterministic start
     double mult_fac;
     if (SP.initial_By > 0.0) { // Lowest Kz mode in the box, amplitude from SP.initial_By
         for (int i=0; i<nMF_; ++i) {
             if (i==1) { // Amplitude specified here, start By 10* larger than other(s)
                 mult_fac = SP.initial_By;
                 for (int k=0; k<nz_full_; ++k) {
-                    meanf_r[i](k) = (dcmplx) mult_fac*cos( 2*zg(k) );
+                    meanf_r[i](k) = (dcmplx) mult_fac*cos( MODE*zg(k) );
                 }
             } else {
                 mult_fac = -0.1*SP.initial_By;
                 for (int k=0; k<nz_full_; ++k) {
-                    meanf_r[i](k) = (dcmplx) mult_fac*cos( 2*zg(k) );
+                    meanf_r[i](k) = (dcmplx) mult_fac*cos( MODE*zg(k) );
                 }
             }
             
