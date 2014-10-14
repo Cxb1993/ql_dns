@@ -17,6 +17,7 @@
 #include "General_Definitions.h"
 #include "Models/Model.h"
 #include "Auxiliary/fftwPlans.h"
+#include "Auxiliary/MPIdata.h"
 
 
 class solution{
@@ -32,7 +33,9 @@ public:
     
     // Initial conditions
     void Initial_Conditions(Inputs &SP,fftwPlans &fft);
-        
+    
+    // Check solution is not NaN
+    void Check_Solution(fftwPlans *fft, MPIdata *mpi);
     
 private:
     // Sizes - nz, nxy (dimension in x,y on each processor), nMF (number of mean fields), nLin (number of linear fields)
@@ -40,6 +43,7 @@ private:
     // Data storage
     dcmplxVec **linear_field_;// Fluctuations - unlike CE2 store fields individually. With container class don't gain much from joining these together
     dcmplxVec *mean_field_; // Mean fields
+    dcmplxVec mean_field_real_; // Different size for Check_Solution
     
     
 };

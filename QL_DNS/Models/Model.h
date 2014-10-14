@@ -93,7 +93,7 @@ public:
     
     ///////////////////////////////////////////////////
     // CFL condition - returns CFL number (e.g., kmax*By+q)
-    virtual double Calculate_CFL() const = 0;
+    virtual double Calculate_CFL(const solution *sol) = 0;
     ///////////////////////////////////////////////////
 
 protected:

@@ -77,7 +77,7 @@ RK3CN::~RK3CN() {
 double RK3CN::Step(double t, solution * sol){
     
     if (variable_dt_) {
-        dt_ = CFLnum_/model_->Calculate_CFL();
+        dt_ = CFLnum_/model_->Calculate_CFL(sol);
         if (dt_ > dtmax_)
             dt_ = dtmax_;
         

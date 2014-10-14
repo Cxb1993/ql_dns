@@ -18,7 +18,7 @@ integs = base+'Integrators/'
 s = '   '
 
 basesrc = Split(base + 'main.cpp'    +s+    base + 'solution.cpp')
-modsrc = Split(models+'ConstantDamping.cpp'   +s+   models+'MHD_BQlin.cpp')
+modsrc = Split(models+'ConstantDamping.cpp'   +s+   models+'MHD_BQlin.cpp'    +s+   models+'MHD_FullQlin.cpp')
 intsrc = Split(integs+'Euler.cpp'   +s+     integs+'EulerCN.cpp'    +s+   integs+'RK3CN.cpp')
 auxsrc = Split(aux+'Input_parameters.cpp'     +s+     aux+'MPIdata.cpp'    +s+    aux+'fftwPlans.cpp'    +s+    aux+'Kdata.cpp'    +s+   aux+'FullSave_Load.cpp'   +s+   aux+'TimeVariables.cpp')
 

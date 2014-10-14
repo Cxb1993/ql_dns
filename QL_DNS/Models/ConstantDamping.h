@@ -55,7 +55,7 @@ public:
     
     //////////////////////////
     // CFL number
-    double Calculate_CFL() const ;
+    double Calculate_CFL(const solution *sol) ;
     
 private:
     const std::string equations_name; // Name of model
@@ -94,6 +94,7 @@ private:
     //               TEMPORARY VARIABLES              //
     doubVec lapFtmp_, lap2tmp_; // Laplacians - nice to still have lap2
     doubVec ilapFtmp_, ilap2tmp_; // Inverse Laplacians
+    dcmplxVec uy_, by_;
     
     dcmplx kxctmp_, kyctmp_;
     double kxtmp_,kytmp_;

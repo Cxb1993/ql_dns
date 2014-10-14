@@ -24,10 +24,12 @@ nMF_(eqs->num_MFs()), nLin_(eqs->num_Lin()), nz_(eqs->NZ()), nz_full_(eqs->NZful
         }
     }
     
+    // Mean fields stored as (Bx, By, Ux, Uy) 
     mean_field_ = new dcmplxVec[nMF_];
     for (int i=0; i<nMF_; ++i) {
-        mean_field_[i] = dcmplxVec(nz_);
+        mean_field_[i] = dcmplxVec::Zero(nz_);
     }
+    mean_field_real_ = dcmplxVec(nz_full_);
     
 }
 
@@ -38,6 +40,8 @@ solution::~solution() {
     delete[] linear_field_;
     delete[] mean_field_;
 }
+
+
 
 
 // Initial conditions
@@ -103,6 +107,43 @@ void solution::Initial_Conditions(Inputs &SP,fftwPlans &fft) {
     
 
     delete[] meanf_r;
+
+}
+
+
+void solution::Check_Solution(fftwPlans *fft, MPIdata *mpi) {
+    dcmplxVec* check_field = mean_field_+1;
+    // Check that mean fields are real
+    fft->inverse(check_field, &mean_field_real_); // Check By
+    
+    if (mean_field_real_.real().abs().sum()/mean_field_real_.imag().abs().sum() < 1e10 &&  mean_field_real_.real().abs().sum()>1e-2){
+        std::stringstream errormess;
+        errormess << "<<<<<<<<<<<<<<>>>>>>>>>>>>>>" << std::endl;
+        errormess << "ERROR: Mean field has developed an imaginary part!!" << std::endl;
+        errormess << "<<<<<<<<<<<<<<>>>>>>>>>>>>>>" << std::endl;
+        mpi->print1(errormess.str());
+        ABORT;
+    }
+    
+    // Stability
+    if (check_field->abs().maxCoeff()>1e20 || mean_field_->abs().maxCoeff()>1e20) {
+        std::stringstream errormess;
+        errormess << "<<<<<<<<<<<<<<>>>>>>>>>>>>>>" << std::endl;
+        errormess << "ERROR: Solution is very large, probably unstable!!" << std::endl;
+        errormess << "<<<<<<<<<<<<<<>>>>>>>>>>>>>>" << std::endl;
+        mpi->print1(errormess.str());
+        ABORT;
+    }
+    
+    //  THIS ISN'T WORKING FOR SOME REASON!!
+    if (!std::isfinite(check_field->abs().sum()) || !std::isfinite(check_field->abs().sum())) {
+        std::stringstream errormess;
+        errormess << "<<<<<<<<<<<<<<>>>>>>>>>>>>>>" << std::endl;
+        errormess << "ERROR: Solution contains NaN or Inf!!" << std::endl;
+        errormess << "<<<<<<<<<<<<<<>>>>>>>>>>>>>>" << std::endl;
+        mpi->print1(errormess.str());
+        ABORT;
+    }
 
 }
 

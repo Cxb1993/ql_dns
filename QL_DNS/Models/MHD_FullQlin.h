@@ -1,13 +1,13 @@
 //
-//  MHD_BQlin.h
+//  MHD_FullQlin.h
 //  QL_DNS
 //
 //  Created by Jonathan Squire on 9/16/14.
 //  Copyright (c) 2014 J Squire. All rights reserved.
 //
 
-#ifndef __QL_DNS__MHD_BQlin__
-#define __QL_DNS__MHD_BQlin__
+#ifndef __QL_DNS__MHD_FullQlin__
+#define __QL_DNS__MHD_FullQlin__
 
 
 #include "Model.h"
@@ -20,10 +20,10 @@
 
 // Basic MHD Quasi-linear class
 // Includes interaction of fluctuations with By and that's all
-class MHD_BQlin : public Model {
+class MHD_FullQlin : public Model {
 public:
-    MHD_BQlin(const Inputs& sp, MPIdata& mpi, fftwPlans& fft);
-    ~MHD_BQlin();
+    MHD_FullQlin(const Inputs& sp, MPIdata& mpi, fftwPlans& fft);
+    ~MHD_FullQlin();
     
     // Equations
     void rhs(const double t, const double dt_lin,
@@ -91,7 +91,7 @@ private:
     int noise_buff_len_; // Length of noise (no need to include dealiased bits)
     
     // Reynolds stresses
-    dcmplxVec bzux_m_uzbx_c_,bzuy_m_uzby_c_;
+    dcmplxVec Bx_drive_,By_drive_, Ux_drive_, Uy_drive_;
     dcmplxVec reynolds_z_tmp_;// Temporary, size NZfull()
     dcmplxVec reynolds_stress_MPI_send_, reynolds_stress_MPI_receive_;
     int num_to_mpi_send_; // Number of terms to send for Reynolds stress per MF variable
@@ -103,16 +103,20 @@ private:
     doubVec ilapFtmp_, ilap2tmp_; // Inverse Laplacians
     
     // Temps for evaulation of main equations
-    dcmplxVec uy_,uz_,by_,bz_;
-    dcmplxVec tmp1_z_,tmp2_z_,tmp3_z_; // Temps after transform (size NZfull() )
+    // u and b and derivatives - Real space
+    dcmplxVec *u_, *b_; // (uy,uz,dx{ux,uy,uz},dy{ux,uy,uz}) (and b)
+    dcmplxVec fluct_y_,fluct_z_; // In Fourier space
     dcmplxVec tmp1_k_,tmp2_k_,tmp3_k_; // Temps before transform (size NZ() )
+    dcmplxVec tmp1_z_;
     
     dcmplx kxctmp_, kyctmp_;
     double kxtmp_,kytmp_;
     int ind_ky_;
     
-    dcmplxVec By_,dzBy_,dzdzBy_; // Mean fields (real space)
+    dcmplxVec MBy_,dzMBy_,MBx_,dzMBx_; // Mean fields (real space)
+    dcmplxVec MUy_,dzMUy_,MUx_,dzMUx_; // Mean fields (real space)
+
     
 };
 
-#endif /* defined(__QL_DNS__MHD_BQlin__) */
+#endif /* defined(__QL_DNS__MHD_FullQlin__) */

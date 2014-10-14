@@ -19,6 +19,8 @@
 		A241D8B919C65E4500E901AB /* FullSave_Load.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D8B719C65E4500E901AB /* FullSave_Load.cpp */; };
 		A241D8BC19C7DDCF00E901AB /* MHD_BQlin.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D8BA19C7DDCF00E901AB /* MHD_BQlin.cpp */; };
 		A241D8C319C922E500E901AB /* RK3CN.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D8C119C922E500E901AB /* RK3CN.cpp */; };
+		A298517D19E738420044CFBE /* MHD_FullQlin.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A298517B19E738420044CFBE /* MHD_FullQlin.cpp */; };
+		A298518019ECB67E0044CFBE /* InterfaceOutput.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A298517E19ECB67E0044CFBE /* InterfaceOutput.cpp */; };
 		A2ED9658199822FF00247E17 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2ED9657199822FF00247E17 /* main.cpp */; };
 		A2ED965A199822FF00247E17 /* QL_DNS.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = A2ED9659199822FF00247E17 /* QL_DNS.1 */; };
 /* End PBXBuildFile section */
@@ -54,7 +56,7 @@
 		A241D8A419A95CF800E901AB /* fftwPlans.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fftwPlans.h; sourceTree = "<group>"; };
 		A241D8A619A9629B00E901AB /* Input_parameters.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Input_parameters.cpp; sourceTree = "<group>"; };
 		A241D8A719A9629B00E901AB /* Input_parameters.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Input_parameters.h; sourceTree = "<group>"; };
-		A241D8A919A9632100E901AB /* SW_test.DSSinput */ = {isa = PBXFileReference; lastKnownFileType = text; path = SW_test.DSSinput; sourceTree = "<group>"; };
+		A241D8A919A9632100E901AB /* FullQL_L141.DSSinput */ = {isa = PBXFileReference; lastKnownFileType = text; path = FullQL_L141.DSSinput; sourceTree = "<group>"; };
 		A241D8AB19A9757600E901AB /* SConstruct */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = SConstruct; sourceTree = "<group>"; };
 		A241D8AE19ABDA3F00E901AB /* TimeVariables.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = TimeVariables.cpp; sourceTree = "<group>"; };
 		A241D8AF19ABDA3F00E901AB /* TimeVariables.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TimeVariables.h; sourceTree = "<group>"; };
@@ -64,6 +66,10 @@
 		A241D8BB19C7DDCF00E901AB /* MHD_BQlin.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MHD_BQlin.h; sourceTree = "<group>"; };
 		A241D8C119C922E500E901AB /* RK3CN.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = RK3CN.cpp; sourceTree = "<group>"; };
 		A241D8C219C922E500E901AB /* RK3CN.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RK3CN.h; sourceTree = "<group>"; };
+		A298517B19E738420044CFBE /* MHD_FullQlin.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MHD_FullQlin.cpp; sourceTree = "<group>"; };
+		A298517C19E738420044CFBE /* MHD_FullQlin.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MHD_FullQlin.h; sourceTree = "<group>"; };
+		A298517E19ECB67E0044CFBE /* InterfaceOutput.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = InterfaceOutput.cpp; sourceTree = "<group>"; };
+		A298517F19ECB67E0044CFBE /* InterfaceOutput.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InterfaceOutput.h; sourceTree = "<group>"; };
 		A2ED9654199822FF00247E17 /* QL_DNS */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = QL_DNS; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2ED9657199822FF00247E17 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		A2ED9659199822FF00247E17 /* QL_DNS.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = QL_DNS.1; sourceTree = "<group>"; };
@@ -86,6 +92,8 @@
 		A241D88C19A391AE00E901AB /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				A298517B19E738420044CFBE /* MHD_FullQlin.cpp */,
+				A298517C19E738420044CFBE /* MHD_FullQlin.h */,
 				A241D88D19A391AE00E901AB /* Model.h */,
 				A241D8BB19C7DDCF00E901AB /* MHD_BQlin.h */,
 				A241D8BA19C7DDCF00E901AB /* MHD_BQlin.cpp */,
@@ -124,6 +132,8 @@
 				A241D8AF19ABDA3F00E901AB /* TimeVariables.h */,
 				A241D8B719C65E4500E901AB /* FullSave_Load.cpp */,
 				A241D8B819C65E4500E901AB /* FullSave_Load.h */,
+				A298517E19ECB67E0044CFBE /* InterfaceOutput.cpp */,
+				A298517F19ECB67E0044CFBE /* InterfaceOutput.h */,
 			);
 			path = Auxiliary;
 			sourceTree = "<group>";
@@ -150,7 +160,7 @@
 			isa = PBXGroup;
 			children = (
 				A2ED9657199822FF00247E17 /* main.cpp */,
-				A241D8A919A9632100E901AB /* SW_test.DSSinput */,
+				A241D8A919A9632100E901AB /* FullQL_L141.DSSinput */,
 				A2ED96601998239200247E17 /* General_Definitions.h */,
 				A2ED96651998288A00247E17 /* solution.cpp */,
 				A2ED96661998288A00247E17 /* solution.h */,
@@ -213,7 +223,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A298517D19E738420044CFBE /* MHD_FullQlin.cpp in Sources */,
 				A241D8BC19C7DDCF00E901AB /* MHD_BQlin.cpp in Sources */,
+				A298518019ECB67E0044CFBE /* InterfaceOutput.cpp in Sources */,
 				A241D89A19A3C6DD00E901AB /* MPIdata.cpp in Sources */,
 				A241D8C319C922E500E901AB /* RK3CN.cpp in Sources */,
 				A241D8A219A7922F00E901AB /* Kdata.cpp in Sources */,

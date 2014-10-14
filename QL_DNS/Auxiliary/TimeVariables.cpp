@@ -45,8 +45,8 @@ clk_diff_(0.0)// Timing
         reynolds_ = new double[num_reynolds_saves_];
     }
     // For mean fields
-    MFdata_c_ = dcmplxVec( nz_full_ );
-    MFdata_d_ = doubVec (nz_full_ );
+    MFdata_c_ = dcmplxVec::Zero( nz_full_ );
+    MFdata_d_ = doubVec::Zero(nz_full_ );
     
     // Saving to disk - TODO improve to save at regular intervals?
     fname_energy_ = simulation_dir_ + "energy.dat";
@@ -140,8 +140,7 @@ TimeVariables::~TimeVariables() {
 
 // Save the data to disk
 void TimeVariables::Save_Data(double t){
-    // Start timing
-    clk_start_ = clock();
+    // Timing put outside of this function (in Calc_Energy_AM_Diss) using start_timing() and finish_timing()
     
     // Run only on root process
     if (mpi_node_bool_){
@@ -172,9 +171,7 @@ void TimeVariables::Save_Data(double t){
         fileS_time_.write( (char*) &t, sizeof(double) );
         
     }
-    
-    // Timing
-    clk_diff_ += (clock() - clk_start_ )/ (double)CLOCKS_PER_SEC;
+
     
 }
 
@@ -194,7 +191,7 @@ void TimeVariables::Save_Mean_Fields(solution *sol, fftwPlans& fft){
         for (int i=0; i<numMF_; ++i) {
             // Take fft - could be done faster with c_to_r fft
             fft.inverse(sol->pMF(i), &MFdata_c_);
-            MFdata_d_ =fft.fac1D()*MFdata_c_.real();
+            MFdata_d_ = fft.fac1D()*MFdata_c_.real();
             //Save
             fileS_mean_fields_.write( (char*) MFdata_d_.data(), sizeof(double)*nz_full_);
         }

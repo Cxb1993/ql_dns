@@ -6,6 +6,13 @@
 //  Copyright (c) 2014 J Squire. All rights reserved.
 //
 
+
+
+//////////////////////////////////////////////////////
+//  WARNING WARNING
+//  CAREFUL USING CONSTANT DAMPING WITH A MULTISTEP INTEGRATOR
+//  Will give eroneous results due to the re-evaluation of the Laplacian at intermediate steps!
+
 #include "ConstantDamping.h"
 
 ConstantDamping::ConstantDamping(const Inputs& sp, MPIdata& mpi, fftwPlans& fft) :
@@ -28,7 +35,7 @@ fft_(fft) // FFT data
     
     // Random generator
     mt_ = boost::random::mt19937(1.0 + mpi_.my_n_v());  // Seed is 1.0, could change
-    ndist_ = boost::random::normal_distribution<double>(0,f_noise_/2); // Normal distribution, standard deviation f_noise_ (factor 2 is since it's complex)
+    ndist_ = boost::random::normal_distribution<double>(0,f_noise_/sqrt(2)); // Normal distribution, standard deviation f_noise_ (factor 2 is since it's complex)
     noise_buff_ = dcmplxVec(num_Lin()*(NZ()-1));// NZ-1 since ky=kz=0 mode is not driven
     
     // Sizes of various arrays used for normalizing things
@@ -39,6 +46,9 @@ fft_(fft) // FFT data
     // NZ^2 for normalizing  mean field energy
     nz2_ = N(2)*N(2);
     
+    // Temps for evaulation of main equations
+    uy_ = dcmplxVec( NZ() );
+    by_ = dcmplxVec( NZ() );
     
     ////////////////////////////////////////////////////
     //               TEMPORARY ARRAYS                 //
@@ -164,12 +174,14 @@ void ConstantDamping::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const sol
     //   ALL OF THIS IS PARALLELIZED
     for (int i=0; i<Dimxy();  ++i){
         // Form Laplacians using time-dependent kx
-        assign_laplacians_(i, t, 1);
+        assign_laplacians_(i, 0*t, 1);
         
         mult_fac = 2;
         if (kytmp_== 0.0 )
             mult_fac = 1; // Only count ky=0 mode once
         
+        lap2tmp_ = lapFtmp_*ilap2tmp_; // lap2tmp_ just a convenient storage
+
         if (tv->energy_save_Q()){
             //////////////////////////////////////
             //     ENERGY
@@ -184,6 +196,12 @@ void ConstantDamping::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const sol
         if (tv->AngMom_save_Q()){
             //////////////////////////////////////
             //   Angular momentum
+            
+            uy_ = ( (-kyctmp_*kxctmp_)*(*sol->pLin(i, 0)) +  K->kz*(*sol->pLin(i, 1)) )*ilap2tmp_;
+            by_ = ( (-kyctmp_*kxctmp_)*(*sol->pLin(i, 2)) +  K->kz*(*sol->pLin(i, 3)) )*ilap2tmp_;
+            
+            AM_u += ( (*sol->pLin(i, 0))*uy_.conjugate() ).real().sum();
+            AM_b += ( (*sol->pLin(i, 2))*by_.conjugate() ).real().sum();
             //
             //////////////////////////////////////
         }
@@ -268,7 +286,7 @@ void ConstantDamping::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const sol
 
 //////////////////////////
 // CFL number
-double ConstantDamping::Calculate_CFL() const {
+double ConstantDamping::Calculate_CFL(const solution *sol) {
     // Returns CFL/dt to calculate dt - in this case don't know
     
     // Pointlessly simple

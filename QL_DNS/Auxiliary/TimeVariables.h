@@ -48,7 +48,11 @@ public:
     void Save_Mean_Fields(solution *sol,  fftwPlans& fft);
     
     // Accumulated time
-    double TVtime() {return clk_diff_;}; // Accumulated time for full saves
+    void start_timing(){clk_start_ = clock();}; // Start timing
+    void finish_timing(){clk_diff_ += (clock() - clk_start_ )/ (double)CLOCKS_PER_SEC;}; // Stop timing
+    
+    double TVtime() {return clk_diff_;}; // Return time
+    
     
 private:
     // Basic data
