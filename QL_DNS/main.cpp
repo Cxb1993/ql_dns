@@ -147,13 +147,17 @@ int main(int argc, char ** argv)
         fluidEqs->Calc_Energy_AM_Diss(time_vars, t, sol);
         time_vars->Save_Mean_Fields(sol,  fft);
     }
-    if (step_since_dump != 0)
+    if (step_since_dump != 0){
+        std::stringstream save_str;
+        save_str << "Saving full solution at time " << t << std::endl;
+        mpi.print1( save_str.str() );
         sol_save->SaveSolution(t, sol);
+    }
     
     // Timing
     
     std::stringstream time_str;
-    time_str << "Finished calculation with average time-step " << integrator->mean_time_step() << std::endl << "Full time "<< interface->ElapsedTime() << "s:" << " IO time " << sol_save->IOtime() << "s: " << "Time variables: " << time_vars->TVtime() << "s" << std::endl;
+    time_str << "Finished calculation at  t = " << t << " with average time-step " << integrator->mean_time_step() << std::endl << "Full time "<< interface->ElapsedTime() << "s:" << " IO time " << sol_save->IOtime() << "s: " << "Time variables: " << time_vars->TVtime() << "s" << std::endl;
     mpi.print1( time_str.str() );
     
 

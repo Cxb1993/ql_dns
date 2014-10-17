@@ -528,12 +528,13 @@ void MHD_FullQlin::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const soluti
     mpi_.SumReduce_doub(mpi_send_buff,mpi_receive_buff,num_to_mpi);
     //    mpi_.SumReduce_IP_doub(&energy_u_f,1); // Is this working?
     
+
     // Currently, TimeVariables is set to save on root process, may want to generalize this at some point (SumReduce_doub is also)
     if (mpi_.my_n_v() == 0) {
         ////////////////////////////////////////////
         ///// All this is only on processor 0  /////
         double divfac=1.0/totalN2_;
-        double divfavMF = 1.0/( NZfull()*NZfull() );
+        
         energy_u = mpi_receive_buff[0]*divfac;
         energy_b = mpi_receive_buff[1]*divfac;
         AM_u = mpi_receive_buff[2]*divfac;
@@ -541,13 +542,13 @@ void MHD_FullQlin::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const soluti
         diss_u = mpi_receive_buff[4]*divfac;
         diss_b = mpi_receive_buff[5]*divfac;
         
-        
         ///////////////////////////////////////
         ///       MEAN FIELDS            //////
         // Only need to calculate on one processor
         double energy_MU=0, energy_MB=0;
         double AM_MU =0, AM_MB=0;
         double diss_MU =0, diss_MB =0;
+        double divfavMF = 1.0/( NZfull()*NZfull() );
         
         energy_MB = ( (*(sol->pMF(0))).abs2().sum() + (*(sol->pMF(1))).abs2().sum() )*divfavMF;
         energy_MU = ( (*(sol->pMF(2))).abs2().sum() + (*(sol->pMF(3))).abs2().sum() )*divfavMF;
@@ -556,8 +557,8 @@ void MHD_FullQlin::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const soluti
         AM_MU = divfavMF*( (*sol->pMF(2))*(sol->pMF(3)->conjugate()) ).real().sum();
         
         diss_MB = (divfavMF*eta_)*( -(K->kz2*sol->pMF(0)->abs2()).sum() - (K->kz2*sol->pMF(1)->abs2()).sum() );
-        diss_MU = (divfavMF*eta_)*( -(K->kz2*sol->pMF(2)->abs2()).sum() - (K->kz2*sol->pMF(3)->abs2()).sum() );
-
+        diss_MU = (divfavMF*nu_)*( -(K->kz2*sol->pMF(2)->abs2()).sum() - (K->kz2*sol->pMF(3)->abs2()).sum() );
+        
         
         ///////////////////////////////////////
         //////         OUTPUT            //////
@@ -585,11 +586,22 @@ void MHD_FullQlin::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const soluti
         
         ///// All this is only on processor 0  /////
         ////////////////////////////////////////////
+        
+        // Set etaK_times_kmax in TimeVariables - This is then used in output for monitoring spatial resolution as simulation progresses
+        // Use kz_max for this scale (sometimes have high x resolution)
+        // Calculate on zero and broadcast
+        tv->etaK_times_kmax[0] = pow(nu_*nu_*nu_/(diss_MU+diss_u),0.25)*(2*PI/L(2)*(N(2)/3));
+        tv->etaK_times_kmax[1] = pow(eta_*eta_*eta_/(diss_MB+diss_b),0.25)*(2*PI/L(2)*(N(2)/3));
+        
     }
     
     tv->Save_Data(t);
     tv->finish_timing();
-
+    
+    mpi_.BroadcastFromNode0_doub(tv->etaK_times_kmax, 2);
+//    if ( tv->etaK_times_kmax[0]<0.5 ||  tv->etaK_times_kmax[1]<0.5)
+//        mpi_.print1("Warning: eta_K is not well resolved by spatial grid!!!\n");
+    
     
 }
 

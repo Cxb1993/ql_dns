@@ -55,6 +55,8 @@ public:
     void PassToNode0_float(float *in_p, float *rec_p, int size_init);
     // Scatter data from node 0
     void ScatterFromNode0_float(float *in_p, float *rec_p, int size_rec_p);
+    // Broadcase from node zero
+    void BroadcastFromNode0_doub(double *in_p, int size);
 private:
     
     // General MPI data

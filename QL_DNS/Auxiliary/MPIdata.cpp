@@ -168,3 +168,12 @@ void MPIdata::ScatterFromNode0_float(float *in_p, float *rec_p, int size_rec_p){
     }
 #endif
 }
+
+void MPIdata::BroadcastFromNode0_doub(double *in_p, int size){
+#ifdef USE_MPI_FLAG 
+    MPI_Bcast(in_p, size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+#endif
+}
+
+
+

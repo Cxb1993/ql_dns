@@ -53,6 +53,8 @@ public:
     
     double TVtime() {return clk_diff_;}; // Return time
     
+    // Kolmogorov scale * Kmax - for monitoring spatial resolution
+    double etaK_times_kmax[2]; // (u, b)
     
 private:
     // Basic data

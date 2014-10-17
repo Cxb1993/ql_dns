@@ -48,6 +48,12 @@ void InterfaceOutput::CheckAll(double t) {
         if (file_exists(dumpstop_name_)) {
             // Stop simulation, saving current state (this is done automatically anyway)
             stop_simulation_ = 1;
+            // Remove file
+            mpi_->Barrier(); // Need barrier, since otherwise file might get deleted before other processes find it exists
+            if (mpi_->my_n_v() == mpi_node_for_print_ ) {
+                if( remove( dumpstop_name_.c_str() ) != 0 )
+                    std::cout << "Error deleting status file!\n\n" ;
+            }
         }
         
         check_i_ = 0 ;
@@ -64,7 +70,7 @@ void InterfaceOutput::output_status(double t) {
     
     double diff = (clock() - start_time_ ) / (double)CLOCKS_PER_SEC;
     // Prints (to std::cout) info about the current run
-    std::cout << "\nCalculation at t = " << t << " (final time t = " << sp_->t_final << ") after " << diff << "s." << std::endl << "Average time-step " << integ_->mean_time_step() << std::endl << "IO time " << fsave_->IOtime() << "s: " << "Time variables calculations: " << tvs_->TVtime() << "s\n" << std::endl;
+    std::cout << "\nCalculation at t = " << t << " (final time t = " << sp_->t_final << ") after " << diff << "s." << std::endl << "Average time-step " << integ_->mean_time_step() << std::endl << "IO time " << fsave_->IOtime() << "s: " << "Time variables calculations: " << tvs_->TVtime() << "s\n" << "Current eta_K*k_max (U, B): (" << tvs_->etaK_times_kmax[0] << ", " << tvs_->etaK_times_kmax[1] << ")\n" << std::endl;
     
     // Delete file
     if( remove( status_name_.c_str() ) != 0 )

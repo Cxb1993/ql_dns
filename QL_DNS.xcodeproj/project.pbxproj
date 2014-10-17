@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A236218819F171F0005531C1 /* IntegratorTests.m in Sources */ = {isa = PBXBuildFile; fileRef = A236217F19F171EF005531C1 /* IntegratorTests.m */; };
+		A236218919F171F0005531C1 /* MatlabRead.m in Sources */ = {isa = PBXBuildFile; fileRef = A236218019F171EF005531C1 /* MatlabRead.m */; };
+		A236218A19F171F0005531C1 /* ReadDumpOutput.m in Sources */ = {isa = PBXBuildFile; fileRef = A236218119F171F0005531C1 /* ReadDumpOutput.m */; };
+		A236218B19F171F0005531C1 /* WriteInitialConditions.m in Sources */ = {isa = PBXBuildFile; fileRef = A236218219F171F0005531C1 /* WriteInitialConditions.m */; };
+		A236218C19F171F0005531C1 /* WriteMRIDSSinput.m in Sources */ = {isa = PBXBuildFile; fileRef = A236218319F171F0005531C1 /* WriteMRIDSSinput.m */; };
 		A241D88B19A3907B00E901AB /* solution.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2ED96651998288A00247E17 /* solution.cpp */; };
 		A241D89019A391AE00E901AB /* ConstantDamping.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D88E19A391AE00E901AB /* ConstantDamping.cpp */; };
 		A241D89719A3928500E901AB /* Euler.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D89219A391C300E901AB /* Euler.cpp */; };
@@ -39,6 +44,14 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A236217F19F171EF005531C1 /* IntegratorTests.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = IntegratorTests.m; sourceTree = "<group>"; };
+		A236218019F171EF005531C1 /* MatlabRead.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MatlabRead.m; sourceTree = "<group>"; };
+		A236218119F171F0005531C1 /* ReadDumpOutput.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ReadDumpOutput.m; sourceTree = "<group>"; };
+		A236218219F171F0005531C1 /* WriteInitialConditions.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WriteInitialConditions.m; sourceTree = "<group>"; };
+		A236218319F171F0005531C1 /* WriteMRIDSSinput.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WriteMRIDSSinput.m; sourceTree = "<group>"; };
+		A236218519F171F0005531C1 /* WriteMRIDNS_Aux.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; path = WriteMRIDNS_Aux.py; sourceTree = "<group>"; };
+		A236218619F171F0005531C1 /* WriteMRIDNS_Aux.pyc */ = {isa = PBXFileReference; lastKnownFileType = file; path = WriteMRIDNS_Aux.pyc; sourceTree = "<group>"; };
+		A236218719F171F0005531C1 /* WriteMRIDNSinput.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; path = WriteMRIDNSinput.py; sourceTree = "<group>"; };
 		A241D88D19A391AE00E901AB /* Model.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Model.h; sourceTree = "<group>"; };
 		A241D88E19A391AE00E901AB /* ConstantDamping.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ConstantDamping.cpp; sourceTree = "<group>"; };
 		A241D88F19A391AE00E901AB /* ConstantDamping.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ConstantDamping.h; sourceTree = "<group>"; };
@@ -56,7 +69,6 @@
 		A241D8A419A95CF800E901AB /* fftwPlans.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fftwPlans.h; sourceTree = "<group>"; };
 		A241D8A619A9629B00E901AB /* Input_parameters.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Input_parameters.cpp; sourceTree = "<group>"; };
 		A241D8A719A9629B00E901AB /* Input_parameters.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Input_parameters.h; sourceTree = "<group>"; };
-		A241D8A919A9632100E901AB /* FullQL_L141.DSSinput */ = {isa = PBXFileReference; lastKnownFileType = text; path = FullQL_L141.DSSinput; sourceTree = "<group>"; };
 		A241D8AB19A9757600E901AB /* SConstruct */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = SConstruct; sourceTree = "<group>"; };
 		A241D8AE19ABDA3F00E901AB /* TimeVariables.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = TimeVariables.cpp; sourceTree = "<group>"; };
 		A241D8AF19ABDA3F00E901AB /* TimeVariables.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TimeVariables.h; sourceTree = "<group>"; };
@@ -89,6 +101,28 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		A236217E19F171EF005531C1 /* Matlab */ = {
+			isa = PBXGroup;
+			children = (
+				A236217F19F171EF005531C1 /* IntegratorTests.m */,
+				A236218019F171EF005531C1 /* MatlabRead.m */,
+				A236218119F171F0005531C1 /* ReadDumpOutput.m */,
+				A236218219F171F0005531C1 /* WriteInitialConditions.m */,
+				A236218319F171F0005531C1 /* WriteMRIDSSinput.m */,
+			);
+			path = Matlab;
+			sourceTree = "<group>";
+		};
+		A236218419F171F0005531C1 /* Python */ = {
+			isa = PBXGroup;
+			children = (
+				A236218519F171F0005531C1 /* WriteMRIDNS_Aux.py */,
+				A236218619F171F0005531C1 /* WriteMRIDNS_Aux.pyc */,
+				A236218719F171F0005531C1 /* WriteMRIDNSinput.py */,
+			);
+			path = Python;
+			sourceTree = "<group>";
+		};
 		A241D88C19A391AE00E901AB /* Models */ = {
 			isa = PBXGroup;
 			children = (
@@ -141,6 +175,8 @@
 		A2ED964B199822FF00247E17 = {
 			isa = PBXGroup;
 			children = (
+				A236217E19F171EF005531C1 /* Matlab */,
+				A236218419F171F0005531C1 /* Python */,
 				A241D8AB19A9757600E901AB /* SConstruct */,
 				A241D89C19A3CA2F00E901AB /* QL_DNS.xcconfig */,
 				A2ED9656199822FF00247E17 /* QL_DNS */,
@@ -160,7 +196,6 @@
 			isa = PBXGroup;
 			children = (
 				A2ED9657199822FF00247E17 /* main.cpp */,
-				A241D8A919A9632100E901AB /* FullQL_L141.DSSinput */,
 				A2ED96601998239200247E17 /* General_Definitions.h */,
 				A2ED96651998288A00247E17 /* solution.cpp */,
 				A2ED96661998288A00247E17 /* solution.h */,
@@ -225,6 +260,7 @@
 			files = (
 				A298517D19E738420044CFBE /* MHD_FullQlin.cpp in Sources */,
 				A241D8BC19C7DDCF00E901AB /* MHD_BQlin.cpp in Sources */,
+				A236218A19F171F0005531C1 /* ReadDumpOutput.m in Sources */,
 				A298518019ECB67E0044CFBE /* InterfaceOutput.cpp in Sources */,
 				A241D89A19A3C6DD00E901AB /* MPIdata.cpp in Sources */,
 				A241D8C319C922E500E901AB /* RK3CN.cpp in Sources */,
@@ -232,11 +268,15 @@
 				A241D8B019ABDA3F00E901AB /* TimeVariables.cpp in Sources */,
 				A241D8A819A9629B00E901AB /* Input_parameters.cpp in Sources */,
 				A241D89019A391AE00E901AB /* ConstantDamping.cpp in Sources */,
+				A236218C19F171F0005531C1 /* WriteMRIDSSinput.m in Sources */,
 				A241D89F19A6375600E901AB /* EulerCN.cpp in Sources */,
 				A241D88B19A3907B00E901AB /* solution.cpp in Sources */,
+				A236218B19F171F0005531C1 /* WriteInitialConditions.m in Sources */,
 				A241D8A519A95CF800E901AB /* fftwPlans.cpp in Sources */,
+				A236218919F171F0005531C1 /* MatlabRead.m in Sources */,
 				A2ED9658199822FF00247E17 /* main.cpp in Sources */,
 				A241D8B919C65E4500E901AB /* FullSave_Load.cpp in Sources */,
+				A236218819F171F0005531C1 /* IntegratorTests.m in Sources */,
 				A241D89719A3928500E901AB /* Euler.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
