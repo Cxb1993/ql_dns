@@ -69,7 +69,6 @@
 		A241D8A419A95CF800E901AB /* fftwPlans.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fftwPlans.h; sourceTree = "<group>"; };
 		A241D8A619A9629B00E901AB /* Input_parameters.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Input_parameters.cpp; sourceTree = "<group>"; };
 		A241D8A719A9629B00E901AB /* Input_parameters.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Input_parameters.h; sourceTree = "<group>"; };
-		A241D8AB19A9757600E901AB /* SConstruct */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = SConstruct; sourceTree = "<group>"; };
 		A241D8AE19ABDA3F00E901AB /* TimeVariables.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = TimeVariables.cpp; sourceTree = "<group>"; };
 		A241D8AF19ABDA3F00E901AB /* TimeVariables.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TimeVariables.h; sourceTree = "<group>"; };
 		A241D8B719C65E4500E901AB /* FullSave_Load.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = FullSave_Load.cpp; sourceTree = "<group>"; };
@@ -177,7 +176,6 @@
 			children = (
 				A236217E19F171EF005531C1 /* Matlab */,
 				A236218419F171F0005531C1 /* Python */,
-				A241D8AB19A9757600E901AB /* SConstruct */,
 				A241D89C19A3CA2F00E901AB /* QL_DNS.xcconfig */,
 				A2ED9656199822FF00247E17 /* QL_DNS */,
 				A2ED9655199822FF00247E17 /* Products */,
