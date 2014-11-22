@@ -86,8 +86,11 @@ Inputs::Inputs(const MPIdata& mpi, const std::string& input_file_name): mpi_node
         nu = Read_From_Input_File_<double>("nu_",fullfile,0.01);
         eta = Read_From_Input_File_<double>("eta_",fullfile,0.01);
         q = Read_From_Input_File_<double>("q_",fullfile, 1.5);
+        // Noise
         f_noise = Read_From_Input_File_<double>("f_noise_",fullfile, 0);
-        
+        noise_range_low = Read_From_Input_File_<double>("noise_range_low_",fullfile, 0.0);
+        noise_range_high = Read_From_Input_File_<double>("noise_range_high_",fullfile, 1e16);
+
         // Boolean flags: remapQ, QuasiLinearQ
         remapQ = Read_From_Input_File_<bool>("Remap?", fullfile, 1);
         QuasiLinearQ = Read_From_Input_File_<bool>("QuasiLinear?", fullfile, 1);
@@ -147,6 +150,7 @@ void Inputs::initialize_() {
     
     fullsave_t = 0.0;
     timevar_t = 0.0;
+    
 }
 
 

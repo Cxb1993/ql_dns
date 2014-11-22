@@ -6,10 +6,10 @@ n2s = @(str) strrep(num2str(str),'.','');
 base_dir='/Users/jsquire/Documents/QL_DNS/';
 data_dir = 'QL_DNS/Data/';
 
-run_dir = ['FullQL_Pm2Noise2Rm16000_L0511/'];
-% run_dir = ['SW_test/'];
+run_dir = ['FullQL_Pm2Noise2Rm16000_L121/'];
+run_dir = ['SW_test/'];
 
-MFdim=128; % Dimension in the mean fields
+MFdim=64; % Dimension in the mean fields
 numMF = 4; % number of mean fields
 num_Energy_AM = 4;
 
@@ -40,14 +40,19 @@ plot(time,tAM,'k',time, (AM) );
 title('AM stress');
 legend('Total','Mean U','Mean B','Fluct u','Fluct b')
 
-% % Dissipation
-% diss = fread(fid_diss,[num_Energy_AM,sim_len],'double');
-% subplot(312);
-% TdissU = (((1/8000)^3./(diss(1,:)+diss(3,:))).^0.25)*(2*pi*128*(1/3));
-% TdissB = (((1/16000)^3./(diss(2,:)+diss(4,:))).^0.25)*(2*pi*128*(1/3));
-% plot(time, TdissU, time ,TdissB);%plot(time,sum(diss),'k',time, diss,'--' );
-% title('Dissipation');
-% legend('Total','Mean U','Mean B','Fluct u','Fluct b')
+% Dissipation
+diss = fread(fid_diss,[num_Energy_AM,sim_len],'double');
+subplot(312);
+TdissU = (((1/8000)^3./(diss(1,:)+diss(2,:))).^0.25)*(2*pi*128*(1/3));
+TdissB = (((1/16000)^3./(diss(2,:)+diss(4,:))).^0.25)*(2*pi*128*(1/3));
+plot(time, TdissU, time ,TdissB);plot(time,sum(diss),'k',time, diss,'--' );
+title('Dissipation');
+legend('Total','Mean U','Mean B','Fluct u','Fluct b')
+
+dt=time(2)-time(1);
+disscheck = [-sum(energy);1.5*cumtrapz(time,tAM);-cumtrapz(time,sum(diss))];
+disscheck = [gradient(sum(energy),time);-(1.5*tAM-sum(diss))];
+plot(time,disscheck,time,sum(disscheck),'k')
 
 % Mean fields;
 % tmp = fread(fid_MF , inf ,'double');

@@ -53,6 +53,8 @@ public:
     double q;  // Shear rate
     // Noise
     double f_noise;  // Driving noise (un-normalized)
+    double noise_range_low; // Low driving noise cutoff (default 0)
+    double noise_range_high; // High driving noise cutoff (default inf)
     // Shearing box
     bool remapQ;   // Whether to remap or not
     // Include quasi-linear feedback

@@ -41,6 +41,13 @@ fft_(fft) // FFT data
     ndist_ = boost::random::normal_distribution<double>(0,f_noise_/sqrt(2)); // Normal distribution, standard deviation f_noise_ (factor sqrt(2) is since it's complex)
     noise_buff_len_ = NZ()-1;
     noise_buff_ = dcmplxVec(num_Lin()*noise_buff_len_);// NZ()-1 since ky=kz=0 mode is not driven
+    // Noise cutoff - compare to laplacian so squared
+    noise_range_[0] = sp.noise_range_low*sp.noise_range_low;
+    noise_range_[1] = sp.noise_range_high*sp.noise_range_high;
+    drive_condition_ = Eigen::Matrix<bool,Eigen::Dynamic,1>(NZ());
+    print_noise_range_();
+
+    
     
     // Sizes of various arrays used for normalizing things
     totalN2_ = N(0)*N(1)*N(2); // Total number of grid points
@@ -625,6 +632,26 @@ inline void MHD_FullQlin::assign_laplacians_(int i, double t, bool need_inverse)
             ilapFtmp_(0) = 1.0; // Otherwise get nans
     }
 }
+
+
+
+void MHD_FullQlin::print_noise_range_(){
+    // Print out total number of driven modes
+    int tot_count = 0, driv_count = 0;
+    int tot_count_all = 0, driv_count_all = 0;// MPI reduced versions
+    for (int i=0; i<Dimxy(); ++i) {
+        assign_laplacians_(i, 0.0, 0);
+        drive_condition_ = lapFtmp_> -noise_range_[1] && lapFtmp_< -noise_range_[0];
+        tot_count += NZ();
+        driv_count += drive_condition_.cast<int>().sum();
+    }
+    mpi_.SumReduce_int(&tot_count, &tot_count_all, 1);
+    mpi_.SumReduce_int(&driv_count, &driv_count_all, 1);
+    std::stringstream noise_output;
+    noise_output << "Driving " << driv_count_all << " out of a total of " << tot_count_all << " modes (k = " << sqrt(noise_range_[0]) << " to " << sqrt(noise_range_[1]) << ")\n";
+    mpi_.print1(noise_output.str());
+    
+}
 //////////////////////////////////////////////////////////
 
 
@@ -663,6 +690,9 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             
             // ky=0 so not many if statements
             double noise_multfac = dt*totalN2_*mult_noise_fac_; // f_noise is included in normal distribution
+            // If k is outside of noise_range_, don't drive.
+            drive_condition_ = lapFtmp_> -noise_range_[1] && lapFtmp_< -noise_range_[0]; // lapFtmp is negative, so conditions backwards
+            
             lapFtmp_ = noise_multfac*lap2tmp_/lapFtmp_; // lapFtmp_ is no longer lapF!
             
             lap2tmp_ = (-noise_multfac*lap2tmp_).sqrt();
@@ -670,28 +700,33 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             
             double *multU_pnt = lapFtmp_.data();
             double *multZeta_pnt = lap2tmp_.data();
+            bool *drive_cond_pnt = drive_condition_.data();
             /////////////////////////////
             
             // ky != 0 modes are completely random
             // U
             dcmplx* ePoint = (*(sol->pLin(i,0) )).data();
             for (int jj=0; jj<NZ(); ++jj) {
-                ePoint[jj] += multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                if (drive_cond_pnt[jj])
+                    ePoint[jj] += multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
             }
             // zeta
             ePoint = (*(sol->pLin(i,1) )).data();
             for (int jj=0; jj<NZ(); ++jj) {
-                ePoint[jj] += multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                if (drive_cond_pnt[jj])
+                    ePoint[jj] += multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
             }
             // b
             ePoint = (*(sol->pLin(i,2) )).data();
             for (int jj=0; jj<NZ(); ++jj) {
-                ePoint[jj] += multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                if (drive_cond_pnt[jj])
+                    ePoint[jj] += multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
             }
             // eta
             ePoint = (*(sol->pLin(i,3) )).data();
             for (int jj=0; jj<NZ(); ++jj) {
-                ePoint[jj] += multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                if (drive_cond_pnt[jj])
+                    ePoint[jj] += multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
             }
         }
         
@@ -726,6 +761,8 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             
             double noise_multfac = dt*totalN2_*mult_noise_fac_; // f_noise is included in normal distribution
             lap2tmp_(0) = 0.0; // Don't drive ky=kz=0 (not really necessary)
+            // If k is outside of noise_range_, don't drive.
+            drive_condition_ = lapFtmp_> -noise_range_[1] && lapFtmp_< -noise_range_[0]; // lapFtmp is negative, so conditions backwards
             
             lapFtmp_ = noise_multfac*lap2tmp_/lapFtmp_; // lapFtmp_ is no longer lapF!
             
@@ -734,35 +771,45 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             
             double *multU_pnt = lapFtmp_.data();
             double *multZeta_pnt = lap2tmp_.data();
+            bool *drive_cond_pnt = drive_condition_.data();
             /////////////////////////////
             
             // Make some noise - add to current k value
+            noise_buff_.setZero();
             dcmplx* noise_buff_dat_ = noise_buff_.data();
             dcmplx* ePoint = (*(sol->pLin(i,0) )).data();
             for (int jj=1; jj<NZ(); ++jj){
-                noise_buff_dat_[jj-1]=multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
-                ePoint[jj] += noise_buff_dat_[jj-1];
+                if (drive_cond_pnt[jj]){
+                    noise_buff_dat_[jj-1]=multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                    ePoint[jj] += noise_buff_dat_[jj-1];
+                }
             }
             // zeta
             noise_buff_dat_ += noise_buff_len_;
             ePoint = (*(sol->pLin(i,1) )).data();
             for (int jj=1; jj<NZ(); ++jj){
-                noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
-                ePoint[jj] += noise_buff_dat_[jj-1];
+                if (drive_cond_pnt[jj]){
+                    noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                    ePoint[jj] += noise_buff_dat_[jj-1];
+                }
             }
             // b
             noise_buff_dat_ += noise_buff_len_;
             ePoint = (*(sol->pLin(i,2) )).data();
             for (int jj=1; jj<NZ(); ++jj){
-                noise_buff_dat_[jj-1]=multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
-                ePoint[jj] += noise_buff_dat_[jj-1];
+                if (drive_cond_pnt[jj]){
+                    noise_buff_dat_[jj-1]=multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                    ePoint[jj] += noise_buff_dat_[jj-1];
+                }
             }
             // eta
             noise_buff_dat_ += noise_buff_len_;
             ePoint = (*(sol->pLin(i,3) )).data();
             for (int jj=1; jj<NZ(); ++jj){
-                noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
-                ePoint[jj] += noise_buff_dat_[jj-1];
+                if (drive_cond_pnt[jj]){
+                    noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                    ePoint[jj] += noise_buff_dat_[jj-1];
+                }
             }
             
             // Send data
@@ -786,10 +833,7 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             for (int nV=0; nV<num_Lin(); ++nV) {
                 noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).reverseInPlace();
             }
-            
-            //        cout << "(kx,ky)=(" << K->kx[i] <<"," << K->ky[i] << ")" << endl;
-            //        cout << noise_buff_.segment(0, nz).transpose().conjugate() <<endl<<endl;
-            
+
             // Add to solution
             for (int nV=0; nV<num_Lin(); ++nV) {
                 (*(sol->pLin(i,nV) )).segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
@@ -815,6 +859,8 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             
             double noise_multfac = dt*totalN2_*mult_noise_fac_; // f_noise is included in normal distribution
             lap2tmp_(0) = 0.0; // Don't drive ky=kz=0
+            // If k is outside of noise_range_, don't drive.
+            drive_condition = lapFtmp_> -noise_range_[1] && lapFtmp_< -noise_range_[0]; // lapFtmp is negative, so conditions backwards
             
             lapFtmp_ = noise_multfac*lap2tmp_/lapFtmp_; // lapFtmp_ is no longer lapF!
             
@@ -823,35 +869,44 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             
             double *multU_pnt = lapFtmp_.data();
             double *multZeta_pnt = lap2tmp_.data();
+            bool *drive_cond_pnt = drive_condition_.data();
             /////////////////////////////
             
             // Make some noise - add to current k value
             dcmplx* noise_buff_dat_ = noise_buff_.data();
             dcmplx* ePoint = (*(sol->pLin(i,0) )).data();
             for (int jj=1; jj<NZ(); ++jj){
-                noise_buff_dat_[jj-1]=multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
-                ePoint[jj] += noise_buff_dat_[jj-1];
+                if (drive_cond_pnt[jj]){
+                    noise_buff_dat_[jj-1]=multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                    ePoint[jj] += noise_buff_dat_[jj-1];
+                }
             }
             // zeta
             noise_buff_dat_ += noise_buff_len_;
             ePoint = (*(sol->pLin(i,1) )).data();
             for (int jj=1; jj<NZ(); ++jj){
-                noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
-                ePoint[jj] += noise_buff_dat_[jj-1];
+                if (drive_cond_pnt[jj]){
+                    noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                    ePoint[jj] += noise_buff_dat_[jj-1];
+                }
             }
             // b
             noise_buff_dat_ += noise_buff_len_;
             ePoint = (*(sol->pLin(i,2) )).data();
             for (int jj=1; jj<NZ(); ++jj){
-                noise_buff_dat_[jj-1]=multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
-                ePoint[jj] += noise_buff_dat_[jj-1];
+                if (drive_cond_pnt[jj]){
+                    noise_buff_dat_[jj-1]=multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                    ePoint[jj] += noise_buff_dat_[jj-1];
+                }
             }
             // eta
             noise_buff_dat_ += noise_buff_len_;
             ePoint = (*(sol->pLin(i,3) )).data();
             for (int jj=1; jj<NZ(); ++jj){
-                noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
-                ePoint[jj] += noise_buff_dat_[jj-1];
+                if (drive_cond_pnt[jj]){
+                    noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                    ePoint[jj] += noise_buff_dat_[jj-1];
+                }
             }
             
             

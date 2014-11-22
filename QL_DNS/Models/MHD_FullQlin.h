@@ -89,6 +89,11 @@ private:
     boost::random::normal_distribution<double> ndist_;
     dcmplxVec noise_buff_;
     int noise_buff_len_; // Length of noise (no need to include dealiased bits)
+    // High/low noise cutoff
+    double noise_range_[2];
+    Eigen::Matrix<bool,Eigen::Dynamic,1> drive_condition_; // Store driving in z as you loop  though x,y
+    void print_noise_range_();
+    
     
     // Reynolds stresses
     dcmplxVec Bx_drive_,By_drive_, Ux_drive_, Uy_drive_;
