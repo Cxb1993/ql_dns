@@ -83,6 +83,8 @@ public:
     ///////////////////////////////////////////////////////
     //  Generate Noise - since I'm not using a true stochastic integrator
     virtual void DrivingNoise(double t, double dt, solution *sol) = 0;
+    // Ability to change the noise range useful for generating initial conditions
+    virtual void ChangeNoiseRange(double kmin, double kmax) = 0;
     ///////////////////////////////////////////////////////
     
     

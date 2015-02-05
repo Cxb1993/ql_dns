@@ -32,7 +32,7 @@ public:
     dcmplxVec* pMF(int i) const {return mean_field_+i;}; //  Fluctuation variables
     
     // Initial conditions
-    void Initial_Conditions(Inputs &SP,fftwPlans &fft);
+    void Initial_Conditions(Inputs &SP,fftwPlans &fft, Model *eqs,MPIdata *mpi);
     
     // Check solution is not NaN
     void Check_Solution(fftwPlans *fft, MPIdata *mpi);

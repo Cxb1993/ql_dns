@@ -90,12 +90,37 @@ void MPIdata::SumReduce_doub(double* in_p, double* out_p, int size) {
 #endif
 
 }
+void MPIdata::SumAllReduce_doub(double* in_p, double* out_p, int size) {
+    // MPI_Reduce wrapper for data of type double - convenient for multiple reasons
+    // Always reduces to processor 0 right now
+#ifdef USE_MPI_FLAG
+    MPI_Allreduce(in_p, out_p, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+#else
+    for (int i=0; i<size; ++i) {
+        out_p[i] = in_p[i];
+    }
+#endif
+    
+}
 
 void MPIdata::SumReduce_int(int* in_p, int* out_p, int size) {
     // MPI_Reduce wrapper for data of type int - convenient for multiple reasons
     // Always reduces to processor 0 right now
 #ifdef USE_MPI_FLAG
     MPI_Reduce(in_p, out_p, size, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+#else
+    for (int i=0; i<size; ++i) {
+        out_p[i] = in_p[i];
+    }
+#endif
+    
+}
+
+void MPIdata::SumAllReduce_int(int* in_p, int* out_p, int size) {
+    // MPI_Reduce wrapper for data of type int - convenient for multiple reasons
+    // Always reduces to processor 0 right now
+#ifdef USE_MPI_FLAG
+    MPI_Allreduce(in_p, out_p, size, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 #else
     for (int i=0; i<size; ++i) {
         out_p[i] = in_p[i];

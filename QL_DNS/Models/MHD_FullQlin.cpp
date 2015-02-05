@@ -16,6 +16,9 @@ q_(sp.q),
 nu_(sp.nu), eta_(sp.eta),
 f_noise_(sp.f_noise),QL_YN_(sp.QuasiLinearQ),
 dont_drive_ky0_modes_(0),// If true, no driving ky=0 modes
+drive_only_velocity_fluctuations_(sp.drive_only_velocityQ), // If true, no magnetic forcing
+drive_only_magnetic_fluctuations_(sp.drive_only_magneticQ), // If true, no velocity forcing
+Omega_(sp.omega), // Rotation
 Model(sp.NZ, sp.NXY , sp.L), // Dimensions - stored in base
 mpi_(mpi), // MPI data
 fft_(fft) // FFT data
@@ -85,6 +88,19 @@ fft_(fft) // FFT data
         if (kmax < 2*PI/L(i)*(N(i)/dealiasfac[i]))
             kmax = 2*PI/L(i)*(N(i)/dealiasfac[i]);
     }
+    
+    // Random settings, print to avoid mistakes
+    std::stringstream prnt;
+    prnt << "Rotation set to " << Omega_ <<"\n";
+    mpi_.print1(prnt.str());
+    if (dont_drive_ky0_modes_)
+        mpi_.print1("ky=0 modes are excluded from this calculation!\n");
+    if (drive_only_velocity_fluctuations_)
+        mpi_.print1("No Magnetic driving noise!\n");
+    if (drive_only_magnetic_fluctuations_)
+        mpi_.print1("No velocity driving noise!\n");
+    
+    
     
     
     ////////////////////////////////////////////////////
@@ -168,15 +184,7 @@ void MHD_FullQlin::rhs(const double t, const double dt_lin,
     tmp1_k_ = fft_.fac1D()*K->kz*(*SolIn->pMF(3));
     fft_.inverse( &tmp1_k_, &dzMUy_);
 
-//    //////////////
-//    //  TO DELETE
-//    MBx_.setZero();
-//    dzMBx_.setZero();
-//    MUx_.setZero();
-//    dzMUx_.setZero();
-//    MUy_.setZero();
-//    dzMUy_.setZero();
-//    //////////////
+
 
     
     // Reynolds stresses -- added to at each step in the loop
@@ -259,9 +267,9 @@ void MHD_FullQlin::rhs(const double t, const double dt_lin,
         fft_.forward(&tmp1_z_, &tmp3_k_);
         // u and zeta dot
         // u
-        *SolOut->pLin(i, 0) = (  (-2.0*kxctmp_*kyctmp_*q_)*(*SolIn->pLin(i, 0)) +  2*K->kz*(*SolIn->pLin(i, 1))  +  (kxctmp_*kxctmp_)*tmp1_k_ + (kxctmp_*kyctmp_)*tmp2_k_ + kxctmp_*K->kz*tmp3_k_ )*ilapFtmp_    -     tmp1_k_;
+        *SolOut->pLin(i, 0) = (  (-2.0*kxctmp_*kyctmp_*q_)*(*SolIn->pLin(i, 0)) +  2*Omega_*K->kz*(*SolIn->pLin(i, 1))  +  (kxctmp_*kxctmp_)*tmp1_k_ + (kxctmp_*kyctmp_)*tmp2_k_ + kxctmp_*K->kz*tmp3_k_ )*ilapFtmp_    -     tmp1_k_;
         // zeta
-        *SolOut->pLin(i, 1) = (q_-2.0)*K->kz*(*SolIn->pLin(i, 0))  -   (K->kz*tmp2_k_ - kyctmp_*tmp3_k_);
+        *SolOut->pLin(i, 1) = (q_-2.0*Omega_)*K->kz*(*SolIn->pLin(i, 0))  -   (K->kz*tmp2_k_ - kyctmp_*tmp3_k_);
         ////////////////////////////////
         ///////////////////////////////////
         //  Advance b and eta
@@ -389,8 +397,8 @@ void MHD_FullQlin::rhs(const double t, const double dt_lin,
     if (QL_YN_) {
         *SolOut->pMF(1) = -q_*(*SolIn->pMF(0)) + By_drive_;
         *SolOut->pMF(0) = Bx_drive_;
-        *SolOut->pMF(2) = 2*(*SolIn->pMF(3)) + Ux_drive_;
-        *SolOut->pMF(3) = (q_-2.0)*(*SolIn->pMF(2)) + Uy_drive_;
+        *SolOut->pMF(2) = 2*Omega_*(*SolIn->pMF(3)) + Ux_drive_;
+        *SolOut->pMF(3) = (q_-2.0*Omega_)*(*SolIn->pMF(2)) + Uy_drive_;
     } else { // Still calculate Reynolds stress in linear calculation
         SolOut->pMF(1)->setZero();
         SolOut->pMF(0)->setZero();
@@ -600,6 +608,38 @@ void MHD_FullQlin::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const soluti
         tv->etaK_times_kmax[0] = pow(nu_*nu_*nu_/(diss_MU+diss_u),0.25)*(2*PI/L(2)*(N(2)/3));
         tv->etaK_times_kmax[1] = pow(eta_*eta_*eta_/(diss_MB+diss_b),0.25)*(2*PI/L(2)*(N(2)/3));
         
+        
+        if (tv->reynolds_save_Q()) {
+            //////////////////////////////////////
+            //   Reynolds stress
+            // Saves quantities to do with the reynolds stress and dynamo
+            // 1) Shear contribution: Re( -q Bx By)/|By|
+            // 2) y emf: Re( bzuy_m_uzby_c_*By )/|By|
+            // 3) y dissipation: eta*k^2*By
+            // 4) x emf: Re( bzux_m_uzbx_c_*Bx )/|Bx|
+            // 5) x dissipation: eta*k^2*Bx
+            // Have assumed k0 to be lowest kz! i.e., driving largest dynamo possible in the box
+            // There may be slight errors here from saving using the updated values of MFin, presumably this is a small effect, especially at high resolution (low dt) and in steady state.
+            double* rey_point = tv->current_reynolds();
+//            rey_point[0] = -q_*((*sol->pMF(0))*(sol->pMF(1)->conjugate())).real().sum()/sqrt(sol->pMF(1)->abs2().sum());
+            // FOR MEASURING DYNAMO IN FIXED B - k1 is wavelength of B
+            // Alpha effect (mean zero) - alpha_yy*k1^2
+            rey_point[0] = (Bx_drive_*K->kz*sol->pMF(1)->conjugate()).real().sum()/sqrt(sol->pMF(1)->abs2().sum());
+            // Shear current - k1^2*eta_yx
+            rey_point[1] = (Bx_drive_*sol->pMF(1)->conjugate()).real().sum()/sqrt(sol->pMF(1)->abs2().sum());
+            // Turbulent By diffusion - -k1^2*eta_yy
+            rey_point[2] = (By_drive_*sol->pMF(1)->conjugate()).real().sum()/sqrt(sol->pMF(1)->abs2().sum());
+            // Off diagonal - k1^2*eta_xy
+            rey_point[3] = (By_drive_*sol->pMF(0)->conjugate()).real().sum()/sqrt(sol->pMF(0)->abs2().sum());
+            // Turbulent Bx diffusion - -k1^2*eta_xx
+            rey_point[5] = (Bx_drive_*sol->pMF(0)->conjugate()).real().sum()/sqrt(sol->pMF(0)->abs2().sum());
+
+            //////////////////////////////////////
+            
+            
+            
+        }
+        
     }
     
     tv->Save_Data(t);
@@ -641,7 +681,11 @@ void MHD_FullQlin::print_noise_range_(){
     int tot_count_all = 0, driv_count_all = 0;// MPI reduced versions
     for (int i=0; i<Dimxy(); ++i) {
         assign_laplacians_(i, 0.0, 0);
-        drive_condition_ = lapFtmp_> -noise_range_[1] && lapFtmp_< -noise_range_[0];
+        if (dont_drive_ky0_modes_ && kytmp_ == 0.0) {
+            drive_condition_.setZero();
+        } else {
+            drive_condition_ = lapFtmp_> -noise_range_[1] && lapFtmp_< -noise_range_[0];
+        }
         tot_count += NZ();
         driv_count += drive_condition_.cast<int>().sum();
     }
@@ -679,6 +723,10 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
     // NZ() is now dealiased NZ!!!
     // So - drive all of NZ and Nyquist frequency is not included
     
+    // Scale the magnetic driving by the value of the mean-field - tangling of the mean-field (see Yousef et al)
+    // 0 turns this off, non-zero is the proportionality
+    double drive_mag_mult = 1.0; // Scaling magnetic noise
+    
     // Adds noise onto linear part of solution
     for (int i=0; i<Dimxy(); ++i) {
         
@@ -701,32 +749,33 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             double *multU_pnt = lapFtmp_.data();
             double *multZeta_pnt = lap2tmp_.data();
             bool *drive_cond_pnt = drive_condition_.data();
+
             /////////////////////////////
             
             // ky != 0 modes are completely random
             // U
             dcmplx* ePoint = (*(sol->pLin(i,0) )).data();
             for (int jj=0; jj<NZ(); ++jj) {
-                if (drive_cond_pnt[jj])
+                if (drive_cond_pnt[jj] && !drive_only_magnetic_fluctuations_)
                     ePoint[jj] += multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
             }
             // zeta
             ePoint = (*(sol->pLin(i,1) )).data();
             for (int jj=0; jj<NZ(); ++jj) {
-                if (drive_cond_pnt[jj])
+                if (drive_cond_pnt[jj] && !drive_only_magnetic_fluctuations_)
                     ePoint[jj] += multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
             }
             // b
             ePoint = (*(sol->pLin(i,2) )).data();
             for (int jj=0; jj<NZ(); ++jj) {
-                if (drive_cond_pnt[jj])
-                    ePoint[jj] += multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                if (drive_cond_pnt[jj] && !drive_only_velocity_fluctuations_)
+                    ePoint[jj] += drive_mag_mult*multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
             }
             // eta
             ePoint = (*(sol->pLin(i,3) )).data();
             for (int jj=0; jj<NZ(); ++jj) {
-                if (drive_cond_pnt[jj])
-                    ePoint[jj] += multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                if (drive_cond_pnt[jj] && !drive_only_velocity_fluctuations_)
+                    ePoint[jj] += drive_mag_mult*multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
             }
         }
         
@@ -779,7 +828,7 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             dcmplx* noise_buff_dat_ = noise_buff_.data();
             dcmplx* ePoint = (*(sol->pLin(i,0) )).data();
             for (int jj=1; jj<NZ(); ++jj){
-                if (drive_cond_pnt[jj]){
+                if (drive_cond_pnt[jj] && !drive_only_magnetic_fluctuations_){
                     noise_buff_dat_[jj-1]=multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
                     ePoint[jj] += noise_buff_dat_[jj-1];
                 }
@@ -788,7 +837,7 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             noise_buff_dat_ += noise_buff_len_;
             ePoint = (*(sol->pLin(i,1) )).data();
             for (int jj=1; jj<NZ(); ++jj){
-                if (drive_cond_pnt[jj]){
+                if (drive_cond_pnt[jj] && !drive_only_magnetic_fluctuations_){
                     noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
                     ePoint[jj] += noise_buff_dat_[jj-1];
                 }
@@ -797,8 +846,8 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             noise_buff_dat_ += noise_buff_len_;
             ePoint = (*(sol->pLin(i,2) )).data();
             for (int jj=1; jj<NZ(); ++jj){
-                if (drive_cond_pnt[jj]){
-                    noise_buff_dat_[jj-1]=multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                if (drive_cond_pnt[jj] && !drive_only_velocity_fluctuations_){
+                    noise_buff_dat_[jj-1]=drive_mag_mult*multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
                     ePoint[jj] += noise_buff_dat_[jj-1];
                 }
             }
@@ -806,8 +855,8 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             noise_buff_dat_ += noise_buff_len_;
             ePoint = (*(sol->pLin(i,3) )).data();
             for (int jj=1; jj<NZ(); ++jj){
-                if (drive_cond_pnt[jj]){
-                    noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                if (drive_cond_pnt[jj] && !drive_only_velocity_fluctuations_){
+                    noise_buff_dat_[jj-1]=drive_mag_mult*multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
                     ePoint[jj] += noise_buff_dat_[jj-1];
                 }
             }
@@ -876,7 +925,7 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             dcmplx* noise_buff_dat_ = noise_buff_.data();
             dcmplx* ePoint = (*(sol->pLin(i,0) )).data();
             for (int jj=1; jj<NZ(); ++jj){
-                if (drive_cond_pnt[jj]){
+                if (drive_cond_pnt[jj] && !drive_only_magnetic_fluctuations_){
                     noise_buff_dat_[jj-1]=multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
                     ePoint[jj] += noise_buff_dat_[jj-1];
                 }
@@ -885,7 +934,7 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             noise_buff_dat_ += noise_buff_len_;
             ePoint = (*(sol->pLin(i,1) )).data();
             for (int jj=1; jj<NZ(); ++jj){
-                if (drive_cond_pnt[jj]){
+                if (drive_cond_pnt[jj] && !drive_only_magnetic_fluctuations_){
                     noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
                     ePoint[jj] += noise_buff_dat_[jj-1];
                 }
@@ -894,8 +943,8 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             noise_buff_dat_ += noise_buff_len_;
             ePoint = (*(sol->pLin(i,2) )).data();
             for (int jj=1; jj<NZ(); ++jj){
-                if (drive_cond_pnt[jj]){
-                    noise_buff_dat_[jj-1]=multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                if (drive_cond_pnt[jj] && !drive_only_velocity_fluctuations_){
+                    noise_buff_dat_[jj-1]=drive_mag_mult*multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
                     ePoint[jj] += noise_buff_dat_[jj-1];
                 }
             }
@@ -903,8 +952,8 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             noise_buff_dat_ += noise_buff_len_;
             ePoint = (*(sol->pLin(i,3) )).data();
             for (int jj=1; jj<NZ(); ++jj){
-                if (drive_cond_pnt[jj]){
-                    noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                if (drive_cond_pnt[jj] && !drive_only_velocity_fluctuations_){
+                    noise_buff_dat_[jj-1]=drive_mag_mult*multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
                     ePoint[jj] += noise_buff_dat_[jj-1];
                 }
             }

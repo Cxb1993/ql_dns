@@ -69,7 +69,7 @@ int main(int argc, char ** argv)
     solution *sol = new solution( fluidEqs );
     
     // Initial condtions
-    sol->Initial_Conditions(SP,fft);
+    sol->Initial_Conditions(SP,fft,fluidEqs,&mpi);
     
     // Set up dump saving class (HDF5)
     FullSave_Load *sol_save = new FullSave_Load(SP, &mpi, fluidEqs); // NB: have to make this a pointer so it can be deleted before MPI_Finalize
@@ -154,8 +154,8 @@ int main(int argc, char ** argv)
         sol_save->SaveSolution(t, sol);
     }
     
-    // Timing
     
+    // Timing
     std::stringstream time_str;
     time_str << "Finished calculation at  t = " << t << " with average time-step " << integrator->mean_time_step() << std::endl << "Full time "<< interface->ElapsedTime() << "s:" << " IO time " << sol_save->IOtime() << "s: " << "Time variables: " << time_vars->TVtime() << "s" << std::endl;
     mpi.print1( time_str.str() );

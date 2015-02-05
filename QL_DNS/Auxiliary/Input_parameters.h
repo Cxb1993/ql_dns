@@ -51,10 +51,13 @@ public:
     double eta;   // Resisitivity - could ignore for hydrodynamic
     // Shear
     double q;  // Shear rate
+    double omega; // Rotation rate
     // Noise
     double f_noise;  // Driving noise (un-normalized)
     double noise_range_low; // Low driving noise cutoff (default 0)
     double noise_range_high; // High driving noise cutoff (default inf)
+    bool drive_only_velocityQ; // Drive only velocity fluctuations
+    bool drive_only_magneticQ; // Drive only magnetic
     // Shearing box
     bool remapQ;   // Whether to remap or not
     // Include quasi-linear feedback

@@ -46,15 +46,36 @@ solution::~solution() {
 
 // Initial conditions
 // Only used for simple cases (e.g., zero in the fluctuations). For more complex cases, save in hdf5 in Matlab and set start_from_saved_Q to 1
-void solution::Initial_Conditions(Inputs &SP,fftwPlans &fft) {
+void solution::Initial_Conditions(Inputs &SP,fftwPlans &fft, Model *eqs, MPIdata *mpi) {
     /////////////////////////////////////////////
     //  LINEAR FIELDS
     for (int i=0; i<nxy_; ++i) {
         for (int j=0; j<nLin_; ++j) {
             linear_field_[i][j].setConstant(0.0);
         }
-        
     }
+    //  Random Initial conditions in the linear fields - use the DrivingNoise routines
+    double init_k_range[2] = {0, 20.0};
+    double init_amp = 0.0; // Standard deviation of the initial conditions
+    // Reset model to produce driving noise like this
+    eqs->ChangeNoiseRange(init_k_range[0], init_k_range[1]);
+    // Add on noise to solution (which is zero)
+    eqs->DrivingNoise(0.0, 1.0, this);
+    double multfac = init_amp/SP.f_noise; // This has some factor in it, but figure out later based on energy. Usually want init_amp ~ 100
+    if ( std::isfinite(multfac) ){
+        for (int i=0; i<nxy_; ++i) {
+            for (int j=0; j<nLin_; ++j) {
+                linear_field_[i][j] *= multfac;
+            }
+        }
+    } else {
+        mpi->print1("Warning: Found NaN or Inf in initial conditions! Starting from zero instead");
+    }
+    // Reset the k range
+    eqs->ChangeNoiseRange(SP.noise_range_low, SP.noise_range_high);
+    //
+    //////////////////////////////////////////
+    
     
     ////////////////////////////////////
     //   MEAN FIELDS
@@ -69,36 +90,40 @@ void solution::Initial_Conditions(Inputs &SP,fftwPlans &fft) {
     // If initial_By>0, only By nonzero, set to lowest kz mode in box
     int MODE = 1; // Mode for deterministic start
     double mult_fac;
-    if (SP.initial_By > 0.0) { // Lowest Kz mode in the box, amplitude from SP.initial_By
+//    if (SP.initial_By > 0.0) { // Lowest Kz mode in the box, amplitude from SP.initial_By
+    // CHANGED SO THAT NEGATIVE IS SEEDING WITH JUST Bx - REVERT SOON!!!!
+    int BxBy = 1; // Choice of Bx (0) or By (1)
+    if (SP.initial_By < 0.0) BxBy=0; // If less than 0 use Bx
+    
         for (int i=0; i<nMF_; ++i) {
-            if (i==1) { // Amplitude specified here, start By 10* larger than other(s)
-                mult_fac = SP.initial_By;
+            if (i==BxBy) { // Amplitude specified here, start By 10* larger than other(s)
+                mult_fac = abs(SP.initial_By);
                 for (int k=0; k<nz_full_; ++k) {
                     meanf_r[i](k) = (dcmplx) mult_fac*cos( MODE*zg(k) );
                 }
             } else {
-                mult_fac = -0.1*SP.initial_By;
+                mult_fac = -0.0*SP.initial_By;
                 for (int k=0; k<nz_full_; ++k) {
                     meanf_r[i](k) = (dcmplx) mult_fac*cos( MODE*zg(k) );
                 }
             }
             
         }
-    } else {// If initial_By<0, all MFs nonzero, random with specified amplitude
-        for (int i=0; i<nMF_; ++i) {
-            
-            if (i==1) { // Amplitude specified here, start By 10* larger than other(s)
-                mult_fac = -SP.initial_By;
-            } else {
-                mult_fac = -0.1*SP.initial_By;
-            }
-            meanf_r[i].real().setRandom();
-            meanf_r[i].imag().setZero();
-            meanf_r[i] = meanf_r[i]-meanf_r[i].mean();
-            meanf_r[i] *= mult_fac;
-        }
-        
-    }
+//    } else {// If initial_By<0, all MFs nonzero, random with specified amplitude
+//        for (int i=0; i<nMF_; ++i) {
+//            
+//            if (i==1) { // Amplitude specified here, start By 10* larger than other(s)
+//                mult_fac = -SP.initial_By;
+//            } else {
+//                mult_fac = -0.1*SP.initial_By;
+//            }
+//            meanf_r[i].real().setRandom();
+//            meanf_r[i].imag().setZero();
+//            meanf_r[i] = meanf_r[i]-meanf_r[i].mean();
+//            meanf_r[i] *= mult_fac;
+//        }
+//        
+//    }
     
     // Take the Fourier transform
     for (int i=0; i<nMF_; ++i) {

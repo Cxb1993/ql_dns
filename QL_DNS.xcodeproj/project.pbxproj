@@ -39,6 +39,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A21B23001A81938C0072FBAA /* FullQL_Pm4Noise1_L148.DSSinput */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = FullQL_Pm4Noise1_L148.DSSinput; sourceTree = "<group>"; };
 		A236217F19F171EF005531C1 /* IntegratorTests.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = IntegratorTests.m; sourceTree = "<group>"; };
 		A236218019F171EF005531C1 /* MatlabRead.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MatlabRead.m; sourceTree = "<group>"; };
 		A236218119F171F0005531C1 /* ReadDumpOutput.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ReadDumpOutput.m; sourceTree = "<group>"; };
@@ -47,7 +48,6 @@
 		A236218519F171F0005531C1 /* WriteMRIDNS_Aux.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; path = WriteMRIDNS_Aux.py; sourceTree = "<group>"; };
 		A236218619F171F0005531C1 /* WriteMRIDNS_Aux.pyc */ = {isa = PBXFileReference; lastKnownFileType = file; path = WriteMRIDNS_Aux.pyc; sourceTree = "<group>"; };
 		A236218719F171F0005531C1 /* WriteMRIDNSinput.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; path = WriteMRIDNSinput.py; sourceTree = "<group>"; };
-		A236218D19F1C844005531C1 /* SW_test.DSSinput */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = SW_test.DSSinput; sourceTree = "<group>"; };
 		A241D88D19A391AE00E901AB /* Model.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Model.h; sourceTree = "<group>"; };
 		A241D88E19A391AE00E901AB /* ConstantDamping.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ConstantDamping.cpp; sourceTree = "<group>"; };
 		A241D88F19A391AE00E901AB /* ConstantDamping.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ConstantDamping.h; sourceTree = "<group>"; };
@@ -189,7 +189,7 @@
 		A2ED9656199822FF00247E17 /* QL_DNS */ = {
 			isa = PBXGroup;
 			children = (
-				A236218D19F1C844005531C1 /* SW_test.DSSinput */,
+				A21B23001A81938C0072FBAA /* FullQL_Pm4Noise1_L148.DSSinput */,
 				A2ED9657199822FF00247E17 /* main.cpp */,
 				A2ED96601998239200247E17 /* General_Definitions.h */,
 				A2ED96651998288A00247E17 /* solution.cpp */,

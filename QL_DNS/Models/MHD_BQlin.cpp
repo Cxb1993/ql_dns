@@ -15,7 +15,8 @@ numMF_(2), numLin_(4),
 q_(sp.q),
 nu_(sp.nu), eta_(sp.eta),
 f_noise_(sp.f_noise),QL_YN_(sp.QuasiLinearQ),
-dont_drive_ky0_modes_(0),// If true, no driving ky=0 modes
+dont_drive_ky0_modes_(1),// If true, no driving ky=0 modes
+Omega_(2.0/3.0*sp.q), // Rotation rate, 2/3*q for Keplerian
 Model(sp.NZ, sp.NXY , sp.L), // Dimensions - stored in base
 mpi_(mpi), // MPI data
 fft_(fft) // FFT data
@@ -157,7 +158,7 @@ void MHD_BQlin::rhs(const double t, const double dt_lin,
         // Inverse
         fft_.forward(&tmp1_z_, SolOut->pLin(i, 0));
         fft_.forward(&tmp2_z_, &tmp2_k_);
-        *SolOut->pLin(i, 0) += ( (-2.0*kxctmp_*kyctmp_*q_)*(*SolIn->pLin(i, 0))  +  2*K->kz*(*SolIn->pLin(i, 1))  +  tmp2_k_)*ilapFtmp_;
+        *SolOut->pLin(i, 0) += ( (-2.0*kxctmp_*kyctmp_*q_)*(*SolIn->pLin(i, 0))  +  2*Omega_*K->kz*(*SolIn->pLin(i, 1))  +  tmp2_k_)*ilapFtmp_;
         
         // zeta
         // (P.q-2)*K.kz.*U.u+S.dealias.*fft(BDyeta+bzDzzB-DxbDzB,[],3)
@@ -173,7 +174,7 @@ void MHD_BQlin::rhs(const double t, const double dt_lin,
         tmp1_z_ += tmp2_z_ + tmp3_z_;
         // Inverse
         fft_.forward(&tmp1_z_, SolOut->pLin(i, 1));
-        *SolOut->pLin(i, 1) += (q_-2.0)*K->kz*(*SolIn->pLin(i, 0));
+        *SolOut->pLin(i, 1) += (q_-2.0*Omega_)*K->kz*(*SolIn->pLin(i, 0));
         
         // b
         // fft(By*ifft(ky*u))
@@ -514,7 +515,11 @@ void MHD_BQlin::print_noise_range_(){
     int tot_count_all = 0, driv_count_all = 0;// MPI reduced versions
     for (int i=0; i<Dimxy(); ++i) {
         assign_laplacians_(i, 0.0, 0);
-        drive_condition_ = lapFtmp_> -noise_range_[1] && lapFtmp_< -noise_range_[0];
+        if (dont_drive_ky0_modes_ && kytmp_ == 0.0) {
+            drive_condition_.setZero();
+        } else {
+            drive_condition_ = lapFtmp_> -noise_range_[1] && lapFtmp_< -noise_range_[0];
+        }
         tot_count += NZ();
         driv_count += drive_condition_.cast<int>().sum();
     }

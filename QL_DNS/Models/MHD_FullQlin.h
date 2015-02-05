@@ -42,6 +42,10 @@ public:
     //////////////////////////////////////////////////////////
     //   DRIVING NOISE
     void DrivingNoise(double t, double dt, solution *sol);
+    // Helpful for generating initial conditions
+    void ChangeNoiseRange(double kmin, double kmax){
+        noise_range_[0] = kmin*kmin;
+        noise_range_[1] = kmax*kmax;};
     //////////////////////////////////////////////////////////
     
     //////////////////////////////////////////////////////////
@@ -70,6 +74,10 @@ private:
     bool QL_YN_; // Flag for QL or not
     
     bool dont_drive_ky0_modes_;
+    bool drive_only_velocity_fluctuations_;
+    bool drive_only_magnetic_fluctuations_;
+    
+    const double Omega_; // Rotation level, 0 for pure shear, 2/3*q for Keplerian
     
     // fft
     fftwPlans &fft_;

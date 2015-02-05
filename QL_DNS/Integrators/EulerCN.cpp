@@ -16,7 +16,7 @@ model_(mod)
 {
     if (SP.dt<0)
         std::cout << "Variable time-step not supported by EulerCN integrator!"<< std::endl;
-    dt_ = abs(SP.dt); // This integrator requires a time-step to be specified in inputs!!
+    dt_ = fabs(SP.dt); // This integrator requires a time-step to be specified in inputs!!
     
     // Solution RHS (dt U = F(U) ) as returned by integrator
     sol_rhs_ = new solution(model_);

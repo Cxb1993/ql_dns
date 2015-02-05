@@ -24,7 +24,7 @@ mpi_(mpi), fsave_(fsaves), tvs_(tv), integ_(integ), sp_(sp)
     
     // File names to look for
     status_name_ = CURR_BASE_DIR + "status"; // Print status
-    dumpstop_name_ = CURR_BASE_DIR + "DumpAndStop";  // Stop simulation and output save to h5 file (so it can be continued).
+    dumpstop_name_ = CURR_BASE_DIR + "dumpandstop";  // Stop simulation and output save to h5 file (so it can be continued).
     
     // MPI - If only one node, change printing node to zero
     if (mpi_->total_n_v() == 1) {
