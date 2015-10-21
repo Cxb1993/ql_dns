@@ -47,6 +47,7 @@ void MPIdata::Split_NXY_Grid(int nxy_full){
 // NB: Have to pass by value if you want to use stringstream
 void MPIdata::print1(std::string instr) const {
     // Print single statement from processor 0
+    Barrier();
     if (my_node_ == 0) {
         std::cout << instr;
     }

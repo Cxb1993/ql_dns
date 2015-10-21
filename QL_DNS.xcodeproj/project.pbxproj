@@ -21,6 +21,7 @@
 		A241D8C319C922E500E901AB /* RK3CN.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D8C119C922E500E901AB /* RK3CN.cpp */; };
 		A298517D19E738420044CFBE /* MHD_FullQlin.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A298517B19E738420044CFBE /* MHD_FullQlin.cpp */; };
 		A298518019ECB67E0044CFBE /* InterfaceOutput.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A298517E19ECB67E0044CFBE /* InterfaceOutput.cpp */; };
+		A2A67A681BD07BE2009F6C05 /* HD_fullU.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2A67A661BD07BE2009F6C05 /* HD_fullU.cpp */; settings = {ASSET_TAGS = (); }; };
 		A2ED9658199822FF00247E17 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2ED9657199822FF00247E17 /* main.cpp */; };
 		A2ED965A199822FF00247E17 /* QL_DNS.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = A2ED9659199822FF00247E17 /* QL_DNS.1 */; };
 /* End PBXBuildFile section */
@@ -39,7 +40,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		A21B23001A81938C0072FBAA /* FullQL_Pm4Noise1_L148.DSSinput */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = FullQL_Pm4Noise1_L148.DSSinput; sourceTree = "<group>"; };
 		A236217F19F171EF005531C1 /* IntegratorTests.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = IntegratorTests.m; sourceTree = "<group>"; };
 		A236218019F171EF005531C1 /* MatlabRead.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MatlabRead.m; sourceTree = "<group>"; };
 		A236218119F171F0005531C1 /* ReadDumpOutput.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ReadDumpOutput.m; sourceTree = "<group>"; };
@@ -77,6 +77,9 @@
 		A298517C19E738420044CFBE /* MHD_FullQlin.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MHD_FullQlin.h; sourceTree = "<group>"; };
 		A298517E19ECB67E0044CFBE /* InterfaceOutput.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = InterfaceOutput.cpp; sourceTree = "<group>"; };
 		A298517F19ECB67E0044CFBE /* InterfaceOutput.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InterfaceOutput.h; sourceTree = "<group>"; };
+		A2A67A661BD07BE2009F6C05 /* HD_fullU.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = HD_fullU.cpp; sourceTree = "<group>"; };
+		A2A67A671BD07BE2009F6C05 /* HD_fullU.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = HD_fullU.h; sourceTree = "<group>"; };
+		A2A67A691BD084BF009F6C05 /* HydroOp5Re4000_N20.DSSinput */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = HydroOp5Re4000_N20.DSSinput; sourceTree = "<group>"; };
 		A2ED9654199822FF00247E17 /* QL_DNS */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = QL_DNS; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2ED9657199822FF00247E17 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		A2ED9659199822FF00247E17 /* QL_DNS.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = QL_DNS.1; sourceTree = "<group>"; };
@@ -123,6 +126,8 @@
 			children = (
 				A298517B19E738420044CFBE /* MHD_FullQlin.cpp */,
 				A298517C19E738420044CFBE /* MHD_FullQlin.h */,
+				A2A67A661BD07BE2009F6C05 /* HD_fullU.cpp */,
+				A2A67A671BD07BE2009F6C05 /* HD_fullU.h */,
 				A241D88D19A391AE00E901AB /* Model.h */,
 				A241D8BB19C7DDCF00E901AB /* MHD_BQlin.h */,
 				A241D8BA19C7DDCF00E901AB /* MHD_BQlin.cpp */,
@@ -189,7 +194,7 @@
 		A2ED9656199822FF00247E17 /* QL_DNS */ = {
 			isa = PBXGroup;
 			children = (
-				A21B23001A81938C0072FBAA /* FullQL_Pm4Noise1_L148.DSSinput */,
+				A2A67A691BD084BF009F6C05 /* HydroOp5Re4000_N20.DSSinput */,
 				A2ED9657199822FF00247E17 /* main.cpp */,
 				A2ED96601998239200247E17 /* General_Definitions.h */,
 				A2ED96651998288A00247E17 /* solution.cpp */,
@@ -253,6 +258,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A2A67A681BD07BE2009F6C05 /* HD_fullU.cpp in Sources */,
 				A298517D19E738420044CFBE /* MHD_FullQlin.cpp in Sources */,
 				A241D8BC19C7DDCF00E901AB /* MHD_BQlin.cpp in Sources */,
 				A298518019ECB67E0044CFBE /* InterfaceOutput.cpp in Sources */,

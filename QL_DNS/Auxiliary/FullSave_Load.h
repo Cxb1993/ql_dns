@@ -66,6 +66,11 @@ private:
     Kdata *K_;
     double q_;
     
+    // MPI info
+#ifdef USE_MPI_FLAG
+    MPI_Info mpiinfo_; // Avoids some MPI filesystem error on the cluster?
+#endif
+    
     // Buffer for writing - not the fastest probably, but otherwise presumably need HDF5 appending capability which seems really annoying. Have to change type anyway, so may not make that much difference
     fcmplxVec lin_write_buff_;
     fcmplxVec MF_write_buff_;

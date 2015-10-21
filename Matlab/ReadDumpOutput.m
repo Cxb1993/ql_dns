@@ -1,8 +1,8 @@
-function fullsol = ReadDumpOutput
+function [fullsol,enuf,kx] = ReadDumpOutput
 % Reads data from h5 file and puts into a matrix in the same format as my
 % other code mat(ny,nx,nz)
 global file num_Lin num_MF;
-file = '/Users/jsquire/Documents/QL_DNS/QL_DNS/Data/FullQL_Pm2Noise2_L184/FullSolution.h5';
+file = '/Users/jsquire/Documents/QL_DNS/QL_DNS/Data/LinByFuR1_Rm0.1Pm1_Lz1S0/FullSolution.h5';
 num_Lin = 4;
 num_MF = 4;
 
@@ -38,6 +38,9 @@ fullsol = cell(num_slices,1);
 to_get = 1:length(slicenames);
 % This is not correct right now! Need to reorder kx values before putting
 % them into matrix
+
+dealiasinds = [1:floor(nz_full/3)+1 ceil(2*nz_full/3)+1:nz_full];
+
 for kk = to_get
     % Find all the kx data
     kxdata = hdf5read(file,[slicenames{kk} '/kx']); 
@@ -46,6 +49,7 @@ for kk = to_get
     fullsol{kk}.data = zeros(ny,nx,nz_full,num_Lin);
     
     kxtmp = zeros(ny,nx);
+    kytmp = reshape(ky,[ny,nx]);
     datatmp = zeros(ny,nx,nz,num_Lin);
     % Get data, unordered in kx
     for jj = 1:size(indkxky,1)
@@ -71,9 +75,26 @@ for kk = to_get
     end
     
 
+    
+    % Energy
+    mfac = 2*ones([ny,nx,nz]); 
+    kzf = repmat(reshape(kz.^2,[1,1,nz]),[ny,nx,1]);
+    kyf = repmat(kytmp.^2,[1,1,nz]);
+    kxf = repmat(kxtmp.^2,[1,1,nz]);
+    lap2=kyf.^2+kzf.^2;
+    lapF=kxf.^2+kyf.^2+kzf.^2;
+    lap2(kyf==0 & kzf==0)=1;
+    mfac(kyf==0)=1;
+    enu{kk}= lapF./lap2.*abs(fullsol{kk}.data(:,:,dealiasinds,1)).^2+1./lap2.*abs(fullsol{kk}.data(:,:,dealiasinds,2)).^2;
+    enu{kk} = mfac.*enu{kk}/(2*(nx+1)^2*(2*ny)^2*nz_full^2);
 end
 
-
+enuf=0;
+for kk=to_get
+    enuf = enuf+enu{kk};
+end
+enuf=enuf/length(to_get);
+    kx = kxtmp(1,:);
 end
 
 
@@ -100,5 +121,45 @@ function out=Rifftn(in)
     dims=size(in);
     parft=ifft(ifft(in,[],2),[],3);
     out=ifft([parft;zeros(1,dims(2),dims(3));conj(parft(end:-1:2,:,:))], [],1);
+
+end
+
+
+function energy=solEnergy(P,K,Ckl)
+
+energy=zeros(P.nx-1,P.ny/2);
+% Calcuates the energy of Ckl solution
+
+mfac=[1;2*ones(P.ny/2-1,1)];
+
+for yyy=1:P.ny/2
+    for xxx=1:P.nx-1
+        % Various k values and matrices
+        ky=K.KY(yyy)
+        kxt = K.kx_array(xxx,yyy)
+        % Form laplacians
+        lap2=ky^2 + K.KZ.^2;
+        lapF=ky^2+kxt^2+K.KZ.^2;
+        if ky==0
+            lap2(1)=1;% Shouldn't be energy in this mode anyway
+        end
+
+        Mkl=abs([lapF./lap2;1./lap2;lapF./lap2;1./lap2]);
+%         if ts==0
+%         disp(['kx = ', num2str(K.kx(xxx)), 'ky = ', num2str(K.ky(yyy))])
+%         disp(num2str(mfac(yyy)*sum(Mkl.*diag(Ckl(:,:,xxx,yyy)))));
+%         end
+
+        energy(xxx,yyy)=mfac(yyy)*sum(Mkl.*diag(Ckl(:,:,xxx,yyy)));
+        
+        if kxt==0.0 && ky==0.0
+            if sum(sum(abs(Ckl(:,:,xxx,yyy))))>1e-10
+                warning('Energy in kx=ky=0 fluctuation tensor')
+            end
+        end
+
+    end
+end
+energy=energy/(2*P.nx^2*P.ny^2*P.nz^2);
 
 end

@@ -29,8 +29,13 @@ clk_diff_(0.0)// Timing
         
         // Have to explicitly account for parallelism here
 #ifdef USE_MPI_FLAG
+        // Avoids some MPI filesystem error on the cluster? OR MAYBE NOT!!
+        MPI_Info_create(&mpiinfo_);
+        MPI_Info_set(mpiinfo_, "romio_ds_read", "disable");
+        MPI_Info_set(mpiinfo_, "romio_ds_write", "disable");
+
         plist_id = H5Pcreate(H5P_FILE_ACCESS);
-        H5Pset_fapl_mpio(plist_id, MPI_COMM_WORLD, MPI_INFO_NULL);
+        H5Pset_fapl_mpio(plist_id, MPI_COMM_WORLD, mpiinfo_);
 #endif
     
 #ifdef USE_MPI_FLAG
@@ -153,6 +158,7 @@ FullSave_Load::~FullSave_Load(){
 #ifdef USE_MPI_FLAG
         H5Fclose(file);
         H5Pclose(plist_id);
+        MPI_Info_free(&mpiinfo_);
 #else
         H5Fclose(file);
 #endif

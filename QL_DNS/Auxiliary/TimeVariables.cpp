@@ -61,33 +61,39 @@ clk_diff_(0.0)// Timing
     
     
     std::ios_base::openmode o_mode;
+    open_append = std::ios::binary | std::ios::app; // Keep since used regularly
     if (SP.start_from_saved_Q) {
-        o_mode = std::ios::binary | std::ios::app;
+        o_mode = open_append;
     } else {
         o_mode = std::ios::binary | std::ios::trunc;
     }
     
     // REMOVE APPEND - OTHERWISE ITS ANNOYING!
     if (mpi_node_bool_) {
-        
+        // Create files
+        // Used to be that files were just left open. This turned out to be annoying since if code crashes binary files are often unreadale for some reason I don't understand.
+        // Thus, now this section of code here just opens and closes the files to create a file. Files will be reopened and closed each time Save_Data is called (probably a bit of a time penalty here, can't imagine it's too bad)
         
         if (en_save_Q_) {
             fileS_energy_.open(fname_energy_.c_str(), o_mode);
             if (!fileS_energy_.is_open() ) {
                 std::cout << "WARNING: " << fname_energy_ <<  " file unable to be opened" << std::endl;
             }
+            fileS_energy_.close();
         }
         if (AM_save_Q_) {
             fileS_angular_momentum_.open(fname_angular_momentum_.c_str(), o_mode);
             if (!fileS_angular_momentum_.is_open() ) {
                 std::cout << "WARNING: " << fname_angular_momentum_ <<  " file unable to be opened" << std::endl;
             }
+            fileS_angular_momentum_.close();
         }
         if (diss_save_Q_) {
             fileS_dissipation_.open(fname_dissipation_.c_str(), o_mode);
             if (!fileS_dissipation_.is_open() ) {
                 std::cout << "WARNING: " << fname_dissipation_ <<  " file unable to be opened" << std::endl;
             }
+            fileS_dissipation_.close();
         }
         // Reynolds stress
         if (rey_save_Q_) {
@@ -95,6 +101,7 @@ clk_diff_(0.0)// Timing
             if (!fileS_reynolds_.is_open() ) {
                 std::cout << "WARNING: " << fname_reynolds_ <<  " file unable to be opened" << std::endl;
             }
+            fileS_reynolds_.close();
         }
         // Mean fields
         if (MF_save_Q_) {
@@ -102,6 +109,7 @@ clk_diff_(0.0)// Timing
             if (!fileS_mean_fields_.is_open() ) {
                 std::cout << "WARNING: " << fname_mean_fields_ <<  " file unable to be opened" << std::endl;
             }
+            fileS_mean_fields_.close();
         }
         
         //        Time data
@@ -109,6 +117,7 @@ clk_diff_(0.0)// Timing
         if (!fileS_time_.is_open() ) {
             std::cout << "WARNING: " << fname_time_ <<  " file unable to be opened" << std::endl;
         }
+        fileS_time_.close();
         
         ////////////////////////////////////////
     }
@@ -127,12 +136,12 @@ TimeVariables::~TimeVariables() {
     }
     
     
-    fileS_energy_.close();
-    fileS_angular_momentum_.close();
-    fileS_dissipation_.close();
-    fileS_reynolds_.close();
-    fileS_mean_fields_.close();
-    fileS_time_.close();
+//    fileS_energy_.close();
+//    fileS_angular_momentum_.close();
+//    fileS_dissipation_.close();
+//    fileS_reynolds_.close();
+//    fileS_mean_fields_.close();
+//    fileS_time_.close();
 
     
 }
@@ -144,6 +153,12 @@ void TimeVariables::Save_Data(double t){
     
     // Run only on root process
     if (mpi_node_bool_){
+        // Open all the files
+        fileS_energy_.open(fname_energy_.c_str(), open_append);
+        fileS_angular_momentum_.open(fname_angular_momentum_.c_str(), open_append);
+        fileS_dissipation_.open(fname_dissipation_.c_str(), open_append);
+        fileS_reynolds_.open(fname_reynolds_.c_str(), open_append);
+        fileS_time_.open(fname_time_.c_str(), open_append);
         
         if (en_save_Q_ ) {
             // Must write each individually since don't know that it is continuous in memory
@@ -170,6 +185,13 @@ void TimeVariables::Save_Data(double t){
         // Write
         fileS_time_.write( (char*) &t, sizeof(double) );
         
+        // Close all the files
+        fileS_energy_.close();
+        fileS_angular_momentum_.close();
+        fileS_dissipation_.close();
+        fileS_reynolds_.close();
+        fileS_time_.close();
+        
     }
 
     
@@ -187,6 +209,8 @@ void TimeVariables::Save_Mean_Fields(solution *sol, fftwPlans& fft){
     
     if ( MF_save_Q_ && mpi_node_bool_ ){
  
+        fileS_mean_fields_.open(fname_mean_fields_.c_str(),open_append);
+        
         // Save each MF variable sequentially
         for (int i=0; i<numMF_; ++i) {
             // Take fft - could be done faster with c_to_r fft
@@ -195,6 +219,8 @@ void TimeVariables::Save_Mean_Fields(solution *sol, fftwPlans& fft){
             //Save
             fileS_mean_fields_.write( (char*) MFdata_d_.data(), sizeof(double)*nz_full_);
         }
+        
+        fileS_mean_fields_.close();
     }
     
     // Timing

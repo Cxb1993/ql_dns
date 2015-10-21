@@ -12,18 +12,20 @@
 MHD_FullQlin::MHD_FullQlin(const Inputs& sp, MPIdata& mpi, fftwPlans& fft) :
 equations_name("MHD_FullQlin"),
 numMF_(4), numLin_(4),
-q_(sp.q),
+q_(sp.q),Omega_(sp.omega), // Rotation
+B0z_(sp.B0z), // Mean vertical field
 nu_(sp.nu), eta_(sp.eta),
 f_noise_(sp.f_noise),QL_YN_(sp.QuasiLinearQ),
 dont_drive_ky0_modes_(0),// If true, no driving ky=0 modes
 drive_only_velocity_fluctuations_(sp.drive_only_velocityQ), // If true, no magnetic forcing
 drive_only_magnetic_fluctuations_(sp.drive_only_magneticQ), // If true, no velocity forcing
-Omega_(sp.omega), // Rotation
+save_full_reynolds_(1),// Saves all the nonlinear stresses if true
+turn_off_fluct_Lorentz_force_(0), // Turn off the b.GB+B.Gb  term in the fluctuating momentum eq
 Model(sp.NZ, sp.NXY , sp.L), // Dimensions - stored in base
 mpi_(mpi), // MPI data
 fft_(fft) // FFT data
 {
-    // Check that model is that specified in input file
+    // Check that model is that specified in input file - unecessary now
     if (sp.equations_to_use != equations_name) {
         std::stringstream error_str;
         error_str << "Model name, " << equations_name << ", does not match that specified in input file, " << sp.equations_to_use << "!!" << std::endl;
@@ -50,7 +52,11 @@ fft_(fft) // FFT data
     drive_condition_ = Eigen::Matrix<bool,Eigen::Dynamic,1>(NZ());
     print_noise_range_();
 
+    if (save_full_reynolds_)
+        num_reynolds_saves_ = 2*NZfull();// ONLY B STRESSES!!!
+    else num_reynolds_saves_=5;
     
+        
     
     // Sizes of various arrays used for normalizing things
     totalN2_ = N(0)*N(1)*N(2); // Total number of grid points
@@ -99,9 +105,10 @@ fft_(fft) // FFT data
         mpi_.print1("No Magnetic driving noise!\n");
     if (drive_only_magnetic_fluctuations_)
         mpi_.print1("No velocity driving noise!\n");
-    
-    
-    
+    if (turn_off_fluct_Lorentz_force_)
+        mpi_.print1("No Lorentz force in fluctuating momentum equation!!!\n");
+    L_mult_ = !turn_off_fluct_Lorentz_force_;
+
     
     ////////////////////////////////////////////////////
     //               TEMPORARY ARRAYS                 //
@@ -256,20 +263,20 @@ void MHD_FullQlin::rhs(const double t, const double dt_lin,
         // Form u.grad(u)-b.grad(b) - put into (tmp1_k_,tmp2_k_,tmp3_k_)
         // Ux dx(ux)+ Uy dy(ux) + uz dzUx
         tmp1_z_ = MUx_*u_[3] + MUy_*u_[6] + u_[2]*dzMUx_ -
-                    (MBx_*b_[3] + MBy_*b_[6] + b_[2]*dzMBx_);
+                    L_mult_*(MBx_*b_[3] + MBy_*b_[6] + b_[2]*dzMBx_);
         fft_.forward(&tmp1_z_, &tmp1_k_);
         // Ux dx(uy)+ Uy dy(uy) + uz dzUy
         tmp1_z_ = MUx_*u_[4] + MUy_*u_[7] + u_[2]*dzMUy_ -
-                    (MBx_*b_[4] + MBy_*b_[7] + b_[2]*dzMBy_);
+                    L_mult_*(MBx_*b_[4] + MBy_*b_[7] + b_[2]*dzMBy_);
         fft_.forward(&tmp1_z_, &tmp2_k_);
         // Ux dx(uz) + Uy dy(uz)
-        tmp1_z_ = MUx_*u_[5] + MUy_*u_[8] - (MBx_*b_[5] + MBy_*b_[8]);
+        tmp1_z_ = MUx_*u_[5] + MUy_*u_[8] - L_mult_*(MBx_*b_[5] + MBy_*b_[8]);
         fft_.forward(&tmp1_z_, &tmp3_k_);
         // u and zeta dot
         // u
-        *SolOut->pLin(i, 0) = (  (-2.0*kxctmp_*kyctmp_*q_)*(*SolIn->pLin(i, 0)) +  2*Omega_*K->kz*(*SolIn->pLin(i, 1))  +  (kxctmp_*kxctmp_)*tmp1_k_ + (kxctmp_*kyctmp_)*tmp2_k_ + kxctmp_*K->kz*tmp3_k_ )*ilapFtmp_    -     tmp1_k_;
+        *SolOut->pLin(i, 0) = (  (-2.0*kxctmp_*kyctmp_*q_)*(*SolIn->pLin(i, 0)) +  2*Omega_*K->kz*(*SolIn->pLin(i, 1))  +  (kxctmp_*kxctmp_)*tmp1_k_ + (kxctmp_*kyctmp_)*tmp2_k_ + kxctmp_*K->kz*tmp3_k_ )*ilapFtmp_   +  B0z_*K->kz*(*SolIn->pLin(i, 2))   -     tmp1_k_;
         // zeta
-        *SolOut->pLin(i, 1) = (q_-2.0*Omega_)*K->kz*(*SolIn->pLin(i, 0))  -   (K->kz*tmp2_k_ - kyctmp_*tmp3_k_);
+        *SolOut->pLin(i, 1) = (q_-2.0*Omega_)*K->kz*(*SolIn->pLin(i, 0))  + B0z_*K->kz*(*SolIn->pLin(i, 3)) -   (K->kz*tmp2_k_ - kyctmp_*tmp3_k_);
         ////////////////////////////////
         ///////////////////////////////////
         //  Advance b and eta
@@ -287,9 +294,9 @@ void MHD_FullQlin::rhs(const double t, const double dt_lin,
         fft_.forward(&tmp1_z_, &tmp3_k_);
         // b and eta dot
         // b
-        *SolOut->pLin(i, 2) = -tmp1_k_;
+        *SolOut->pLin(i, 2) = B0z_*K->kz*(*SolIn->pLin(i, 0)) - tmp1_k_;
         // eta
-        *SolOut->pLin(i, 3) = -q_*K->kz*(*SolIn->pLin(i, 2))   -   (K->kz*tmp2_k_ - kyctmp_*tmp3_k_);
+        *SolOut->pLin(i, 3) = -q_*K->kz*(*SolIn->pLin(i, 2))  + B0z_*K->kz*(*SolIn->pLin(i, 1))  -   (K->kz*tmp2_k_ - kyctmp_*tmp3_k_);
         
         
         ///////////////////////////////////////
@@ -395,10 +402,12 @@ void MHD_FullQlin::rhs(const double t, const double dt_lin,
     //////////////////////////////////////
     ////   MEAN FIELDS    ////////////////
     if (QL_YN_) {
-        *SolOut->pMF(1) = -q_*(*SolIn->pMF(0)) + By_drive_;
-        *SolOut->pMF(0) = Bx_drive_;
-        *SolOut->pMF(2) = 2*Omega_*(*SolIn->pMF(3)) + Ux_drive_;
-        *SolOut->pMF(3) = (q_-2.0*Omega_)*(*SolIn->pMF(2)) + Uy_drive_;
+        // B update
+        *SolOut->pMF(1) = -q_*(*SolIn->pMF(0)) + B0z_*K->kz*(*SolIn->pMF(3)) + By_drive_;
+        *SolOut->pMF(0) = B0z_*K->kz*(*SolIn->pMF(2)) + Bx_drive_;
+        // U update
+        *SolOut->pMF(2) = 2*Omega_*(*SolIn->pMF(3)) + B0z_*K->kz*(*SolIn->pMF(0)) + Ux_drive_;
+        *SolOut->pMF(3) = (q_-2.0*Omega_)*(*SolIn->pMF(2)) + B0z_*K->kz*(*SolIn->pMF(1)) + Uy_drive_;
     } else { // Still calculate Reynolds stress in linear calculation
         SolOut->pMF(1)->setZero();
         SolOut->pMF(0)->setZero();
@@ -511,6 +520,8 @@ void MHD_FullQlin::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const soluti
             energy_u += mult_fac*(  lap2tmp_*( *(sol->pLin(i,0)) ).abs2() - ilap2tmp_*( *(sol->pLin(i,1)) ).abs2()  ).sum();
             energy_b += mult_fac*(  lap2tmp_*( *(sol->pLin(i,2)) ).abs2() - ilap2tmp_*( *(sol->pLin(i,3)) ).abs2()  ).sum();
             //////////////////////////////////////
+            
+//            std::cout << "kx = " << kxtmp_ << ", ky = " << kytmp_ << ": " <<mult_fac*(  lap2tmp_*( *(sol->pLin(i,0)) ).abs2() - ilap2tmp_*( *(sol->pLin(i,1)) ).abs2()  ).sum() <<std::endl;
         }
         if (tv->AngMom_save_Q()){
             //////////////////////////////////////
@@ -548,7 +559,7 @@ void MHD_FullQlin::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const soluti
     if (mpi_.my_n_v() == 0) {
         ////////////////////////////////////////////
         ///// All this is only on processor 0  /////
-        double divfac=1.0/totalN2_;
+        double divfac=L(2)/totalN2_;
         
         energy_u = mpi_receive_buff[0]*divfac;
         energy_b = mpi_receive_buff[1]*divfac;
@@ -563,7 +574,7 @@ void MHD_FullQlin::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const soluti
         double energy_MU=0, energy_MB=0;
         double AM_MU =0, AM_MB=0;
         double diss_MU =0, diss_MB =0;
-        double divfavMF = 1.0/( NZfull()*NZfull() );
+        double divfavMF = L(2)/( NZfull()*NZfull() );
         
         energy_MB = ( (*(sol->pMF(0))).abs2().sum() + (*(sol->pMF(1))).abs2().sum() )*divfavMF;
         energy_MU = ( (*(sol->pMF(2))).abs2().sum() + (*(sol->pMF(3))).abs2().sum() )*divfavMF;
@@ -621,21 +632,64 @@ void MHD_FullQlin::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const soluti
             // Have assumed k0 to be lowest kz! i.e., driving largest dynamo possible in the box
             // There may be slight errors here from saving using the updated values of MFin, presumably this is a small effect, especially at high resolution (low dt) and in steady state.
             double* rey_point = tv->current_reynolds();
-//            rey_point[0] = -q_*((*sol->pMF(0))*(sol->pMF(1)->conjugate())).real().sum()/sqrt(sol->pMF(1)->abs2().sum());
-            // FOR MEASURING DYNAMO IN FIXED B - k1 is wavelength of B
-            // Alpha effect (mean zero) - alpha_yy*k1^2
-            rey_point[0] = (Bx_drive_*K->kz*sol->pMF(1)->conjugate()).real().sum()/sqrt(sol->pMF(1)->abs2().sum());
-            // Shear current - k1^2*eta_yx
-            rey_point[1] = (Bx_drive_*sol->pMF(1)->conjugate()).real().sum()/sqrt(sol->pMF(1)->abs2().sum());
-            // Turbulent By diffusion - -k1^2*eta_yy
-            rey_point[2] = (By_drive_*sol->pMF(1)->conjugate()).real().sum()/sqrt(sol->pMF(1)->abs2().sum());
-            // Off diagonal - k1^2*eta_xy
-            rey_point[3] = (By_drive_*sol->pMF(0)->conjugate()).real().sum()/sqrt(sol->pMF(0)->abs2().sum());
-            // Turbulent Bx diffusion - -k1^2*eta_xx
-            rey_point[5] = (Bx_drive_*sol->pMF(0)->conjugate()).real().sum()/sqrt(sol->pMF(0)->abs2().sum());
+            
+            if (!save_full_reynolds_){
+                // FOR MEASURING DYNAMO IN FIXED B - k1 is wavelength of B
+                // NB: Had a mistake before, was 1/sqrt(sol->pMF(1)->abs2().sum()) rather than 1/(sol->pMF(1)->abs2().sum()). This makes the answer depend on the chosen value of the imposed field.
+                
+                // Alpha effect (mean zero) - alpha_yy*k1^2
+                rey_point[0] = (Bx_drive_*K->kz*sol->pMF(1)->conjugate()).real().sum()/(sol->pMF(1)->abs2().sum());
+                // Shear current - k1^2*eta_yx
+                rey_point[1] = (Bx_drive_*sol->pMF(1)->conjugate()).real().sum()/(sol->pMF(1)->abs2().sum());
+                // Turbulent By diffusion - -k1^2*eta_yy
+                rey_point[2] = (By_drive_*sol->pMF(1)->conjugate()).real().sum()/(sol->pMF(1)->abs2().sum());
+                // Bx nonzero
+                // Off diagonal - k1^2*eta_xy
+                rey_point[3] = (By_drive_*sol->pMF(0)->conjugate()).real().sum()/(sol->pMF(0)->abs2().sum());
+                // Turbulent Bx diffusion - -k1^2*eta_xx
+                rey_point[4] = (Bx_drive_*sol->pMF(0)->conjugate()).real().sum()/sol->pMF(0)->abs2().sum();
+                
+                
+                
+                
+//                // Measuring Channel modes - keep B and U stresses
+//                // Alpha effect (mean zero) - alpha_yy*k1^2
+//                rey_point[0] = (Bx_drive_*K->kz*sol->pMF(1)->conjugate()).real().sum()/sqrt(sol->pMF(1)->abs2().sum());
+//                // Bx driving/damping
+//                rey_point[1] = (Bx_drive_*sol->pMF(0)->conjugate()).real().sum()/sqrt(sol->pMF(0)->abs2().sum());
+//                // By driving/damping
+//                rey_point[2] = (By_drive_*sol->pMF(1)->conjugate()).real().sum()/sqrt(sol->pMF(1)->abs2().sum());
+//                // U Reynolds and Maxwell stresses
+//                // Ux driving/damping
+//                rey_point[3] = (Ux_drive_*sol->pMF(2)->conjugate()).real().sum()/sqrt(sol->pMF(2)->abs2().sum());
+//                // Uy driving/damping
+//                rey_point[4] = (Uy_drive_*sol->pMF(3)->conjugate()).real().sum()/sqrt(sol->pMF(3)->abs2().sum());
+            } else {
+                // SAVE FULL NONLINEAR STRESS DATA
+                // Only saving B data for now
+                fft_.inverse( &Bx_drive_, &reynolds_z_tmp_);
+                for (int jj=0; jj<NZfull(); ++jj) {
+                    rey_point[jj] = real(reynolds_z_tmp_(jj))*fft_.fac1D();
+                }
+                fft_.inverse( &By_drive_, &reynolds_z_tmp_);
+                for (int jj=0; jj<NZfull(); ++jj) {
+                    rey_point[jj+NZfull()] = real(reynolds_z_tmp_(jj))*fft_.fac1D();
+                }
+                
+                
+
+
+//                fft_.inverse( &Ux_drive_, &reynolds_z_tmp_);
+//                for (int i=2*NZfull(); i<3*NZfull(); ++i) {
+//                    rey_point[i] = reynolds_z_tmp_(i).real()*fft_.fac1D();
+//                }
+//                fft_.inverse( &Uy_drive_, &reynolds_z_tmp_);
+//                for (int i=3*NZfull(); i<4*NZfull(); ++i) {
+//                    rey_point[i] = reynolds_z_tmp_(i).real()*fft_.fac1D();
+//                }
+            }
 
             //////////////////////////////////////
-            
             
             
         }
@@ -909,7 +963,7 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             double noise_multfac = dt*totalN2_*mult_noise_fac_; // f_noise is included in normal distribution
             lap2tmp_(0) = 0.0; // Don't drive ky=kz=0
             // If k is outside of noise_range_, don't drive.
-            drive_condition = lapFtmp_> -noise_range_[1] && lapFtmp_< -noise_range_[0]; // lapFtmp is negative, so conditions backwards
+            drive_condition_ = lapFtmp_> -noise_range_[1] && lapFtmp_< -noise_range_[0]; // lapFtmp is negative, so conditions backwards
             
             lapFtmp_ = noise_multfac*lap2tmp_/lapFtmp_; // lapFtmp_ is no longer lapF!
             

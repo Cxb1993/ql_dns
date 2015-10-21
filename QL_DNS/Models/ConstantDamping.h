@@ -38,12 +38,13 @@ public:
     int num_MFs() const {return numMF_;};  // Number of mean fields
     int num_Lin() const {return numLin_;}; // Number of fluctuating fields
     
+    int num_reynolds_saves(){return 5;};
     
     //////////////////////////////////////////////////////////
     //   DRIVING NOISE
     void DrivingNoise(double t, double dt, solution *sol);
     // Helpful for generating initial conditions
-    void ChangeNoiseRange(double kmin, double kmax){};
+    void ChangeNoiseRange(double fnoise, double kmin, double kmax){};
     //////////////////////////////////////////////////////////
 
     //////////////////////////////////////////////////////////

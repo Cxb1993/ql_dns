@@ -21,7 +21,7 @@ Model(sp.NZ, sp.NXY , sp.L), // Dimensions - stored in base
 mpi_(mpi), // MPI data
 fft_(fft) // FFT data
 {
-    // Check that model is that specified in input file
+    // Check that model is that specified in input file - unecessary now
     if (sp.equations_to_use != equations_name) {
         std::stringstream error_str;
         error_str << "Model name, " << equations_name << ", does not match that specified in input file, " << sp.equations_to_use << "!!" << std::endl;
@@ -416,7 +416,7 @@ void MHD_BQlin::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const solution 
     if (mpi_.my_n_v() == 0) {
         ////////////////////////////////////////////
         ///// All this is only on processor 0  /////
-        double divfac=1.0/totalN2_;
+        double divfac=L(2)/totalN2_;
         energy_u = mpi_receive_buff[0]*divfac;
         energy_b = mpi_receive_buff[1]*divfac;
         AM_u = mpi_receive_buff[2]*divfac;
@@ -430,7 +430,7 @@ void MHD_BQlin::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const solution 
         double energy_MU=0, energy_MB=0;
         double AM_MU =0, AM_MB=0;
         double diss_MU =0, diss_MB =0;
-        double divfavMF = 1.0/( NZfull()*NZfull() );
+        double divfavMF = L(2)/( NZfull()*NZfull() );
         
         energy_MB = ( (*(sol->pMF(0))).abs2().sum() + (*(sol->pMF(1))).abs2().sum() )*divfavMF;
         
@@ -739,7 +739,7 @@ void MHD_BQlin::DrivingNoise(double t, double dt, solution *sol) {
             double noise_multfac = dt*totalN2_*mult_noise_fac_; // f_noise is included in normal distribution
             lap2tmp_(0) = 0.0; // Don't drive ky=kz=0
             // If k is outside of noise_range_, don't drive.
-            drive_condition = lapFtmp_> -noise_range_[1] && lapFtmp_< -noise_range_[0]; // lapFtmp is negative, so conditions backwards
+            drive_condition_ = lapFtmp_> -noise_range_[1] && lapFtmp_< -noise_range_[0]; // lapFtmp is negative, so conditions backwards
             
             lapFtmp_ = noise_multfac*lap2tmp_/lapFtmp_; // lapFtmp_ is no longer lapF!
             

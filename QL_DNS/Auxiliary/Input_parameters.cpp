@@ -87,6 +87,9 @@ Inputs::Inputs(const MPIdata& mpi, const std::string& input_file_name): mpi_node
         eta = Read_From_Input_File_<double>("eta_",fullfile,0.01);
         q = Read_From_Input_File_<double>("q_",fullfile, 1.5);
         omega = Read_From_Input_File_<double>("omega_",fullfile, 1.0);
+        // Mean B fields
+        B0z = Read_From_Input_File_<double>("B0z_", fullfile, 0.0);
+
         
         // Noise
         f_noise = Read_From_Input_File_<double>("f_noise_",fullfile, 0);

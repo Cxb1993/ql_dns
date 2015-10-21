@@ -46,6 +46,8 @@ public:
     double timvar_save_interval;   // Interval for saving energy, AM etc.
     double fullsol_save_interval;   // Interval for saving full solution
     
+    // Mean magnetic field
+    double B0z;
     // Dissipation
     double nu;   // Viscosity
     double eta;   // Resisitivity - could ignore for hydrodynamic

@@ -18,8 +18,7 @@
 #include "../Auxiliary/Input_parameters.h"
 #include "../Auxiliary/MPIdata.h"
 
-// Basic MHD Quasi-linear class
-// Includes interaction of fluctuations with By and that's all
+
 class MHD_FullQlin : public Model {
 public:
     MHD_FullQlin(const Inputs& sp, MPIdata& mpi, fftwPlans& fft);
@@ -38,12 +37,15 @@ public:
     int num_MFs() const {return numMF_;};  // Number of mean fields
     int num_Lin() const {return numLin_;}; // Number of fluctuating fields
     
+    int num_reynolds_saves(){return num_reynolds_saves_;};
     
     //////////////////////////////////////////////////////////
     //   DRIVING NOISE
     void DrivingNoise(double t, double dt, solution *sol);
     // Helpful for generating initial conditions
-    void ChangeNoiseRange(double kmin, double kmax){
+    void ChangeNoiseRange(double fnoise, double kmin, double kmax){
+        f_noise_=fnoise;
+        ndist_ = boost::random::normal_distribution<double>(0,f_noise_/sqrt(2));
         noise_range_[0] = kmin*kmin;
         noise_range_[1] = kmax*kmax;};
     //////////////////////////////////////////////////////////
@@ -70,12 +72,18 @@ private:
     double nu_, eta_; // dissipation
     double f_noise_; // Driving noise
     const double q_; // q
+    // Mean magnetic field
+    const double B0z_;
     
     bool QL_YN_; // Flag for QL or not
     
     bool dont_drive_ky0_modes_;
     bool drive_only_velocity_fluctuations_;
     bool drive_only_magnetic_fluctuations_;
+    bool save_full_reynolds_;
+    bool turn_off_fluct_Lorentz_force_;
+    int L_mult_;
+    int num_reynolds_saves_;
     
     const double Omega_; // Rotation level, 0 for pure shear, 2/3*q for Keplerian
     

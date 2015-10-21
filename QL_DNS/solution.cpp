@@ -55,13 +55,13 @@ void solution::Initial_Conditions(Inputs &SP,fftwPlans &fft, Model *eqs, MPIdata
         }
     }
     //  Random Initial conditions in the linear fields - use the DrivingNoise routines
-    double init_k_range[2] = {0, 20.0};
-    double init_amp = 0.0; // Standard deviation of the initial conditions
+    double init_k_range[2] = {0, 4000.0};
+    double init_amp = 0; // Standard deviation of the initial conditions
     // Reset model to produce driving noise like this
-    eqs->ChangeNoiseRange(init_k_range[0], init_k_range[1]);
+    eqs->ChangeNoiseRange(1.0, init_k_range[0], init_k_range[1]);
     // Add on noise to solution (which is zero)
     eqs->DrivingNoise(0.0, 1.0, this);
-    double multfac = init_amp/SP.f_noise; // This has some factor in it, but figure out later based on energy. Usually want init_amp ~ 100
+    double multfac = init_amp; // This has some factor in it, but figure out later based on energy. Usually want init_amp ~ 100
     if ( std::isfinite(multfac) ){
         for (int i=0; i<nxy_; ++i) {
             for (int j=0; j<nLin_; ++j) {
@@ -72,7 +72,7 @@ void solution::Initial_Conditions(Inputs &SP,fftwPlans &fft, Model *eqs, MPIdata
         mpi->print1("Warning: Found NaN or Inf in initial conditions! Starting from zero instead");
     }
     // Reset the k range
-    eqs->ChangeNoiseRange(SP.noise_range_low, SP.noise_range_high);
+    eqs->ChangeNoiseRange(SP.f_noise, SP.noise_range_low, SP.noise_range_high);
     //
     //////////////////////////////////////////
     
@@ -91,13 +91,12 @@ void solution::Initial_Conditions(Inputs &SP,fftwPlans &fft, Model *eqs, MPIdata
     int MODE = 1; // Mode for deterministic start
     double mult_fac;
 //    if (SP.initial_By > 0.0) { // Lowest Kz mode in the box, amplitude from SP.initial_By
-    // CHANGED SO THAT NEGATIVE IS SEEDING WITH JUST Bx - REVERT SOON!!!!
     int BxBy = 1; // Choice of Bx (0) or By (1)
-    if (SP.initial_By < 0.0) BxBy=0; // If less than 0 use Bx
+    if (SP.initial_By > 0.0) {//BxBy=1;} // If less than 0 use Bx
     
         for (int i=0; i<nMF_; ++i) {
             if (i==BxBy) { // Amplitude specified here, start By 10* larger than other(s)
-                mult_fac = abs(SP.initial_By);
+                mult_fac = fabs(SP.initial_By);
                 for (int k=0; k<nz_full_; ++k) {
                     meanf_r[i](k) = (dcmplx) mult_fac*cos( MODE*zg(k) );
                 }
@@ -109,22 +108,32 @@ void solution::Initial_Conditions(Inputs &SP,fftwPlans &fft, Model *eqs, MPIdata
             }
             
         }
-//    } else {// If initial_By<0, all MFs nonzero, random with specified amplitude
+//        mult_fac= -SP.initial_By;
 //        for (int i=0; i<nMF_; ++i) {
-//            
-//            if (i==1) { // Amplitude specified here, start By 10* larger than other(s)
-//                mult_fac = -SP.initial_By;
-//            } else {
-//                mult_fac = -0.1*SP.initial_By;
+//            for (int k=0; k<nz_full_; ++k) {
+//                if (i==0) meanf_r[i](k) = (dcmplx) -0.6*mult_fac*cos( MODE*zg(k) );//Bx
+//                if (i==1) meanf_r[i](k) = (dcmplx) mult_fac*cos( MODE*zg(k) ); //By
+//                if (i==2) meanf_r[i](k) = (dcmplx) -0.4*mult_fac*sin( MODE*zg(k) ); //Ux
+//                if (i==3) meanf_r[i](k) = (dcmplx) -0.4*mult_fac*sin( MODE*zg(k) ); //Uy
 //            }
-//            meanf_r[i].real().setRandom();
-//            meanf_r[i].imag().setZero();
-//            meanf_r[i] = meanf_r[i]-meanf_r[i].mean();
-//            meanf_r[i] *= mult_fac;
 //        }
-//        
-//    }
-    
+//
+    } else {// If initial_By<0, all MFs nonzero, random with specified amplitude
+        for (int i=0; i<nMF_; ++i) {
+            
+            if (i==1) { // Amplitude specified here, start By 10* larger than other(s)
+                mult_fac = -SP.initial_By;
+            } else {
+                mult_fac = -SP.initial_By;
+            }
+            meanf_r[i].real().setRandom();
+            meanf_r[i].imag().setZero();
+            meanf_r[i] = meanf_r[i]-meanf_r[i].mean();
+            meanf_r[i] *= mult_fac;
+        }
+        
+    }
+
     // Take the Fourier transform
     for (int i=0; i<nMF_; ++i) {
         fft.forward(meanf_r+i, mean_field_+i);

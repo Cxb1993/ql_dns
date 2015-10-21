@@ -94,6 +94,8 @@ private:
     std::string fname_reynolds_;
     std::string fname_time_;
     
+    std::ios_base::openmode open_append;
+    
     // Mean fields
     std::ofstream fileS_mean_fields_;
     std::string fname_mean_fields_;

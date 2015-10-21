@@ -33,8 +33,8 @@ for nx = [1:NX/2 NX/2+2:NX]
         % Get data from ICs
         kxyslice = reshape(ICs.u(ny,nx,dealias),[NZde,1]);
         kxyslice = [kxyslice; reshape(ICs.zeta(ny,nx,dealias),[NZde,1])];
-        kxyslice = [kxyslice; reshape(ICs.b(ny,nx,dealias),[NZde,1])];
-        kxyslice = [kxyslice; reshape(ICs.eta(ny,nx,dealias),[NZde,1])];
+%         kxyslice = [kxyslice; reshape(ICs.b(ny,nx,dealias),[NZde,1])];
+%         kxyslice = [kxyslice; reshape(ICs.eta(ny,nx,dealias),[NZde,1])];
         % Work out kx and index
         if nx<=NX/2
             kxi = nx;
@@ -53,11 +53,11 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Mean fields
 MFdata = reshape(ICs.Bx(:,:,dealias),[NZde,1]);
-MFdata = [MFdata; reshape(ICs.By(:,:,dealias),[NZde,1])];
-if any(strcmp(properties(ICs),'Ux'))
-    MFdata = [MFdata; reshape(ICs.Ux(:,:,dealias),[NZde,1])];
-    MFdata = [MFdata; reshape(ICs.Uy(:,:,dealias),[NZde,1])];
-end
+MFdata = 0*[MFdata; reshape(ICs.By(:,:,dealias),[NZde,1])];
+% if any(strcmp(properties(ICs),'Ux'))
+%     MFdata = [MFdata; reshape(ICs.Ux(:,:,dealias),[NZde,1])];
+%     MFdata = [MFdata; reshape(ICs.Uy(:,:,dealias),[NZde,1])];
+% end
 MFdata = [real(MFdata) imag(MFdata)].';
 % Write to file
 h5create(file,'/t=0/Mean',size(MFdata),'Datatype','single'); 
