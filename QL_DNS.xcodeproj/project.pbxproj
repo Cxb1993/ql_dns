@@ -79,7 +79,7 @@
 		A298517F19ECB67E0044CFBE /* InterfaceOutput.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InterfaceOutput.h; sourceTree = "<group>"; };
 		A2A67A661BD07BE2009F6C05 /* HD_fullU.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = HD_fullU.cpp; sourceTree = "<group>"; };
 		A2A67A671BD07BE2009F6C05 /* HD_fullU.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = HD_fullU.h; sourceTree = "<group>"; };
-		A2A67A691BD084BF009F6C05 /* HydroOp5Re4000_N20.DSSinput */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = HydroOp5Re4000_N20.DSSinput; sourceTree = "<group>"; };
+		A2A67A691BD084BF009F6C05 /* HydroOp5Re4000_N15.DSSinput */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = HydroOp5Re4000_N15.DSSinput; sourceTree = "<group>"; };
 		A2ED9654199822FF00247E17 /* QL_DNS */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = QL_DNS; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2ED9657199822FF00247E17 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		A2ED9659199822FF00247E17 /* QL_DNS.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = QL_DNS.1; sourceTree = "<group>"; };
@@ -194,7 +194,7 @@
 		A2ED9656199822FF00247E17 /* QL_DNS */ = {
 			isa = PBXGroup;
 			children = (
-				A2A67A691BD084BF009F6C05 /* HydroOp5Re4000_N20.DSSinput */,
+				A2A67A691BD084BF009F6C05 /* HydroOp5Re4000_N15.DSSinput */,
 				A2ED9657199822FF00247E17 /* main.cpp */,
 				A2ED96601998239200247E17 /* General_Definitions.h */,
 				A2ED96651998288A00247E17 /* solution.cpp */,

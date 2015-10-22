@@ -10,7 +10,7 @@ nx_ = 128,  ny_ = 128,  nz_ = 128
 // Time parameters
 dt_ = -0.050000000000000
 CFL_ =            1.50
-t_initial_ = 0.000000000000000,   t_final_ = 200.000000000000000,
+t_initial_ = 0.000000000000000,   t_final_ = 150.000000000000000,
 
 // Saving
 tv_save_ = 0.100000000000000,   // Save energy, momentum etc. time-step
@@ -21,10 +21,10 @@ mean_field_save? = 1  // Save mean fields
 
 // General physical parameters
 q_ = 1.000000000000000
-omega_ = 0.500000000000000
+omega_ = 0.50000000000000
 B0z_ = 0.000000000000000
 nu_ = 0.0002500000000000,  eta_ = 0.00200000000000,   // Dissipation parameters
-f_noise_ = 20.000000000000000
+f_noise_ = 15.000000000000000
 
 noise_range_low_ = 15.000000000000000,  noise_range_high_ = 20000.000000000000000
 
@@ -35,4 +35,4 @@ Remap? = 1
 QuasiLinear? = 1
 
 // Restart simulation
-start_from_saved? = 0
+start_from_saved? = 1

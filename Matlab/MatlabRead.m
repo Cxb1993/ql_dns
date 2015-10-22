@@ -7,7 +7,7 @@ n2s = @(s) num2str(s);
 base_dir='/Users/jsquire/Documents/QL_DNS/';
 data_dir = 'QL_DNS/Data/';
 
-run_dir = ['HydroOp5Re4000_N50' '/'];
+run_dir = ['HydroOp5Re4000_N15' '/'];
 % run_dir = 'YousefN500_S2L16/';
 
 MFdim=128; % Dimension in the mean fields
@@ -90,7 +90,7 @@ for ii=0:numMF-1
     MFmean{ii+1} = sqrt(sum(abs(MF{ii+1}).^2)/MFdim);
 end
 subplot(311);
-htime = 1;tf=floor(length(time));
+htime = 10;tf=floor(length(time));
 % plot(time(1:htime), log10(MFmean{2}(1:htime)),time(1:htime),
 % log10(MFmean{1}(1:htime)),...
 %     time(1:htime), log10(MFmean{3}(1:htime)),time(1:htime), log10(MFmean{4}(1:htime)))
