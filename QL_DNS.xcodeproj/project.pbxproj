@@ -21,7 +21,10 @@
 		A241D8C319C922E500E901AB /* RK3CN.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A241D8C119C922E500E901AB /* RK3CN.cpp */; };
 		A298517D19E738420044CFBE /* MHD_FullQlin.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A298517B19E738420044CFBE /* MHD_FullQlin.cpp */; };
 		A298518019ECB67E0044CFBE /* InterfaceOutput.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A298517E19ECB67E0044CFBE /* InterfaceOutput.cpp */; };
-		A2A67A681BD07BE2009F6C05 /* HD_fullU.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2A67A661BD07BE2009F6C05 /* HD_fullU.cpp */; settings = {ASSET_TAGS = (); }; };
+		A2A3F88E1C875165007979C0 /* CompMHDIso_FixedMF.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2A3F88C1C875165007979C0 /* CompMHDIso_FixedMF.cpp */; };
+		A2A3F8951C88BD93007979C0 /* RK3CN_Elin.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2A3F8931C88BD93007979C0 /* RK3CN_Elin.cpp */; };
+		A2A3F8981C8E064E007979C0 /* CompMHDKinetic_FixedMF.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2A3F8961C8E064E007979C0 /* CompMHDKinetic_FixedMF.cpp */; };
+		A2A67A681BD07BE2009F6C05 /* HD_fullU.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2A67A661BD07BE2009F6C05 /* HD_fullU.cpp */; };
 		A2ED9658199822FF00247E17 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2ED9657199822FF00247E17 /* main.cpp */; };
 		A2ED965A199822FF00247E17 /* QL_DNS.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = A2ED9659199822FF00247E17 /* QL_DNS.1 */; };
 /* End PBXBuildFile section */
@@ -77,9 +80,15 @@
 		A298517C19E738420044CFBE /* MHD_FullQlin.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MHD_FullQlin.h; sourceTree = "<group>"; };
 		A298517E19ECB67E0044CFBE /* InterfaceOutput.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = InterfaceOutput.cpp; sourceTree = "<group>"; };
 		A298517F19ECB67E0044CFBE /* InterfaceOutput.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InterfaceOutput.h; sourceTree = "<group>"; };
+		A2A3F88C1C875165007979C0 /* CompMHDIso_FixedMF.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CompMHDIso_FixedMF.cpp; sourceTree = "<group>"; };
+		A2A3F88D1C875165007979C0 /* CompMHDIso_FixedMF.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CompMHDIso_FixedMF.h; sourceTree = "<group>"; };
+		A2A3F8931C88BD93007979C0 /* RK3CN_Elin.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = RK3CN_Elin.cpp; sourceTree = "<group>"; };
+		A2A3F8941C88BD93007979C0 /* RK3CN_Elin.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RK3CN_Elin.h; sourceTree = "<group>"; };
+		A2A3F8961C8E064E007979C0 /* CompMHDKinetic_FixedMF.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CompMHDKinetic_FixedMF.cpp; sourceTree = "<group>"; };
+		A2A3F8971C8E064E007979C0 /* CompMHDKinetic_FixedMF.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CompMHDKinetic_FixedMF.h; sourceTree = "<group>"; };
 		A2A67A661BD07BE2009F6C05 /* HD_fullU.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = HD_fullU.cpp; sourceTree = "<group>"; };
 		A2A67A671BD07BE2009F6C05 /* HD_fullU.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = HD_fullU.h; sourceTree = "<group>"; };
-		A2A67A691BD084BF009F6C05 /* HydroOp5Re4000_N15.DSSinput */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = HydroOp5Re4000_N15.DSSinput; sourceTree = "<group>"; };
+		A2A67A691BD084BF009F6C05 /* CompTest.DSSinput */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = CompTest.DSSinput; sourceTree = "<group>"; };
 		A2ED9654199822FF00247E17 /* QL_DNS */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = QL_DNS; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2ED9657199822FF00247E17 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		A2ED9659199822FF00247E17 /* QL_DNS.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = QL_DNS.1; sourceTree = "<group>"; };
@@ -124,6 +133,10 @@
 		A241D88C19A391AE00E901AB /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				A2A3F88C1C875165007979C0 /* CompMHDIso_FixedMF.cpp */,
+				A2A3F88D1C875165007979C0 /* CompMHDIso_FixedMF.h */,
+				A2A3F8961C8E064E007979C0 /* CompMHDKinetic_FixedMF.cpp */,
+				A2A3F8971C8E064E007979C0 /* CompMHDKinetic_FixedMF.h */,
 				A298517B19E738420044CFBE /* MHD_FullQlin.cpp */,
 				A298517C19E738420044CFBE /* MHD_FullQlin.h */,
 				A2A67A661BD07BE2009F6C05 /* HD_fullU.cpp */,
@@ -140,6 +153,8 @@
 		A241D89119A391C300E901AB /* Integrators */ = {
 			isa = PBXGroup;
 			children = (
+				A2A3F8931C88BD93007979C0 /* RK3CN_Elin.cpp */,
+				A2A3F8941C88BD93007979C0 /* RK3CN_Elin.h */,
 				A241D8C119C922E500E901AB /* RK3CN.cpp */,
 				A241D8C219C922E500E901AB /* RK3CN.h */,
 				A241D89D19A6375600E901AB /* EulerCN.cpp */,
@@ -194,7 +209,7 @@
 		A2ED9656199822FF00247E17 /* QL_DNS */ = {
 			isa = PBXGroup;
 			children = (
-				A2A67A691BD084BF009F6C05 /* HydroOp5Re4000_N15.DSSinput */,
+				A2A67A691BD084BF009F6C05 /* CompTest.DSSinput */,
 				A2ED9657199822FF00247E17 /* main.cpp */,
 				A2ED96601998239200247E17 /* General_Definitions.h */,
 				A2ED96651998288A00247E17 /* solution.cpp */,
@@ -263,11 +278,14 @@
 				A241D8BC19C7DDCF00E901AB /* MHD_BQlin.cpp in Sources */,
 				A298518019ECB67E0044CFBE /* InterfaceOutput.cpp in Sources */,
 				A241D89A19A3C6DD00E901AB /* MPIdata.cpp in Sources */,
+				A2A3F88E1C875165007979C0 /* CompMHDIso_FixedMF.cpp in Sources */,
 				A241D8C319C922E500E901AB /* RK3CN.cpp in Sources */,
+				A2A3F8951C88BD93007979C0 /* RK3CN_Elin.cpp in Sources */,
 				A241D8A219A7922F00E901AB /* Kdata.cpp in Sources */,
 				A241D8B019ABDA3F00E901AB /* TimeVariables.cpp in Sources */,
 				A241D8A819A9629B00E901AB /* Input_parameters.cpp in Sources */,
 				A241D89019A391AE00E901AB /* ConstantDamping.cpp in Sources */,
+				A2A3F8981C8E064E007979C0 /* CompMHDKinetic_FixedMF.cpp in Sources */,
 				A241D89F19A6375600E901AB /* EulerCN.cpp in Sources */,
 				A241D88B19A3907B00E901AB /* solution.cpp in Sources */,
 				A241D8A519A95CF800E901AB /* fftwPlans.cpp in Sources */,

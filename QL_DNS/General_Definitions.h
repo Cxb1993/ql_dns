@@ -46,7 +46,7 @@
 #include <hdf5.h>
 #include "hdf5_hl.h"
 #include <fftw3.h>
- #define EIGEN_NO_DEBUG  // Define to turn off eigen range checking
+#define EIGEN_NO_DEBUG  // Define to turn off eigen range checking
 #include "../Eigen/Dense"
 #include "../External_headers/tinydir.h"
 
@@ -95,7 +95,7 @@ const std::string CURR_BASE_DIR = "/Users/jsquire/Documents/QL_DNS/QL_DNS/";
 const std::string DATA_DIR = "/Users/jsquire/Documents/QL_DNS/QL_DNS/Data/";
 // Data directory is defined from root so that /p/... can be used on the cluster
 
-//using namespace std; // FOR DEBUGGING (cout), DELETE LATER
+using namespace std; // FOR DEBUGGING (cout), DELETE LATER
 
 #define MAX_NAME 512 // For c style strings, max length of name
 

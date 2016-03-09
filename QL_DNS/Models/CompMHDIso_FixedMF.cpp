@@ -1,26 +1,31 @@
 //
-//  MHD_FullQlin.cpp
+//  CompMHDIso_FixedMF.cpp
 //  QL_DNS
 //
-//  Created by Jonathan Squire on 9/16/14.
-//  Copyright (c) 2014 J Squire. All rights reserved.
+//  Created by Jonathan Squire on 3/2/16.
+//  Copyright © 2016 J Squire. All rights reserved.
 //
 
-#include "MHD_FullQlin.h"
+#include "CompMHDIso_FixedMF.h"
 
-// Includes interaction of fluctuations with By and that's all
-MHD_FullQlin::MHD_FullQlin(const Inputs& sp, MPIdata& mpi, fftwPlans& fft) :
-equations_name("MHD_FullQlin"),
-numMF_(4), numLin_(4),
+// Compressible MHD
+// Mean fields are rho, Ux, Uy, Bx, By (with constant Bz also), and full compressible equations in linear variables.
+// NB: No MF stresses, fully linear
+CompMHDIso_FixedMF::CompMHDIso_FixedMF(const Inputs& sp, MPIdata& mpi, fftwPlans& fft) :
+equations_name("CompMHDIso_FixedMF"),
+numMF_(4), numLin_(6),
 q_(sp.q),Omega_(sp.omega), // Rotation
 B0z_(sp.B0z), // Mean vertical field
-nu_(sp.nu), eta_(sp.eta),
+rho0_(sp.rho0), // Mean density
+P0_(sp.P0), // Background pressure, determines sound speed
+cs20_(P0_/rho0_), // Sound speed
+nu_(sp.nu), eta_(sp.eta), kappa_(sp.kappa),
+viscosity_order_(sp.viscosity_order),
 f_noise_(sp.f_noise),QL_YN_(sp.QuasiLinearQ),
 dont_drive_ky0_modes_(0),// If true, no driving ky=0 modes
 drive_only_velocity_fluctuations_(sp.drive_only_velocityQ), // If true, no magnetic forcing
 drive_only_magnetic_fluctuations_(sp.drive_only_magneticQ), // If true, no velocity forcing
 save_full_reynolds_(0),// Saves all the nonlinear stresses if true
-turn_off_fluct_Lorentz_force_(0), // Turn off the b.GB+B.Gb  term in the fluctuating momentum eq
 Model(sp.NZ, sp.NXY , sp.L), // Dimensions - stored in base
 mpi_(mpi), // MPI data
 fft_(fft) // FFT data
@@ -33,6 +38,9 @@ fft_(fft) // FFT data
         ABORT;
     }
     
+    // Linear variables are
+    // 0: rho, 1: vx, 2: vy, 3: vz, 4: bx, 5: jx
+    
     // Setup MPI
     mpi_.Split_NXY_Grid( Dimxy_full() ); // Work out MPI splitting
     // Assign K data
@@ -41,22 +49,25 @@ fft_(fft) // FFT data
     fft_.calculatePlans( NZfull(), NZ() );
     
     
-    // Random generator // static_cast<unsigned int>(clock()+mpi_.my_n_v())
+    
+    
+    // Random generator //static_cast<unsigned int>(clock()+mpi_.my_n_v())
     mt_ = boost::random::mt19937( static_cast<unsigned int>(clock()+mpi_.my_n_v()) );  // Seed is from time
     ndist_ = boost::random::normal_distribution<double>(0,f_noise_/sqrt(2)); // Normal distribution, standard deviation f_noise_ (factor sqrt(2) is since it's complex)
-    noise_buff_len_ = NZ()-1;
-    noise_buff_ = dcmplxVec(num_Lin()*noise_buff_len_);// NZ()-1 since ky=kz=0 mode is not driven
+    noise_buff_len_ = NZ()-1;// NZ()-1 since ky=kz=0 mode is not driven
+    num_noise_vars_ = 4;
+    noise_buff_ = dcmplxVec(num_noise_vars_*noise_buff_len_); // Generate divergence free noise so only 4 cmpts
     // Noise cutoff - compare to laplacian so squared
     noise_range_[0] = sp.noise_range_low*sp.noise_range_low;
     noise_range_[1] = sp.noise_range_high*sp.noise_range_high;
     drive_condition_ = Eigen::Matrix<bool,Eigen::Dynamic,1>(NZ());
     print_noise_range_();
-
-    if (save_full_reynolds_)
-        num_reynolds_saves_ = 2*NZfull();// ONLY B STRESSES!!!
-    else num_reynolds_saves_=4;
     
-        
+    if (save_full_reynolds_)
+        num_reynolds_saves_ = 4*NZfull();
+    else num_reynolds_saves_=4;   // Saves stress on each MF
+    
+    
     
     // Sizes of various arrays used for normalizing things
     totalN2_ = N(0)*N(1)*N(2); // Total number of grid points
@@ -105,10 +116,11 @@ fft_(fft) // FFT data
         mpi_.print1("No Magnetic driving noise!\n");
     if (drive_only_magnetic_fluctuations_)
         mpi_.print1("No velocity driving noise!\n");
-    if (turn_off_fluct_Lorentz_force_)
-        mpi_.print1("No Lorentz force in fluctuating momentum equation!!!\n");
-    L_mult_ = !turn_off_fluct_Lorentz_force_;
-
+    // Viscosity at kmax, useful for hyperviscosities
+    prnt.str("");
+    prnt << "nu*k^n ~ 1 at k = " << pow(1./nu_,1.0/viscosity_order_) << " (" << pow(1./nu_,1./viscosity_order_)/kmax << "*kmax): nu*kmax^n = " << nu_*pow(kmax,viscosity_order_) << std::endl;
+    mpi_.print1(prnt.str());
+    
     
     ////////////////////////////////////////////////////
     //               TEMPORARY ARRAYS                 //
@@ -127,20 +139,25 @@ fft_(fft) // FFT data
     b_ = new dcmplxVec[9];
     for (int i=0; i<9; ++i) {
         u_[i] = dcmplxVec( NZfull() );
+        u_[i].setZero();
         b_[i] = dcmplxVec( NZfull() );
+        b_[i].setZero();
     }
+    rho_ = dcmplxVec( NZfull() );
+    divu_ = dcmplxVec( NZfull() );
     // Size NZfull()
     tmp1_z_ = dcmplxVec( NZfull() );
     // Size NZ() (kz,ky,kz)
     tmp1_k_ = dcmplxVec( NZ() );
     tmp2_k_ = dcmplxVec( NZ() );
     tmp3_k_ = dcmplxVec( NZ() );
+    tmp4_k_ = dcmplxVec( NZ() );
     //  Size NZ() uy, uz etc.
-    fluct_y_ = dcmplxVec( NZ() ); // k space versions of flutctuating y and z
-    fluct_z_ = dcmplxVec( NZ() );
-
-
-
+    b_y_ = dcmplxVec( NZ() ); // k space versions of flutctuating y and z
+    b_z_ = dcmplxVec( NZ() );
+    
+    
+    
     
     //  Real space versions of mean fields - non-dealiased dimension
     MBx_ = dcmplxVec::Zero( NZfull() );
@@ -151,25 +168,27 @@ fft_(fft) // FFT data
     dzMUx_ = dcmplxVec::Zero( NZfull() );
     MUy_ = dcmplxVec::Zero( NZfull() );
     dzMUy_ = dcmplxVec::Zero( NZfull() );
-
+    
     
 }
 
 
-MHD_FullQlin::~MHD_FullQlin(){
+CompMHDIso_FixedMF::~CompMHDIso_FixedMF(){
     delete K;
     delete[] u_;
     delete[] b_;
 }
 
-void MHD_FullQlin::rhs(const double t, const double dt_lin,
-                          const solution * SolIn, solution * SolOut,doubVec **linOpFluct) {
+void CompMHDIso_FixedMF::rhs(const double t, const double dt_lin,
+                       const solution * SolIn, solution * SolOut,doubVec **linOpFluct) {
     // Calculate mean fields in real space
     // Calculate MFs in real space     By_ = MFin[1].matrix()*fft1Dfac_; // fft back doesn't include normalization
     // (NB could be optimized slightly by including memory copy in multiplication)
     
     // MEAN FIELDS IN REAL SPACE (Use tmp1_k_ as tmp variable)
     // Mean fields stored as (Bx, By, Ux, Uy)
+    // Even though these are fixed in time, keep the sam format for passing things around here.
+    // Assumed rho0 is constant
     // Bx
     tmp1_k_ = (*SolIn->pMF(0))*fft_.fac1D();
     fft_.inverse( &tmp1_k_, &MBx_);
@@ -190,13 +209,13 @@ void MHD_FullQlin::rhs(const double t, const double dt_lin,
     fft_.inverse( &tmp1_k_, &MUy_);
     tmp1_k_ = fft_.fac1D()*K->kz*(*SolIn->pMF(3));
     fft_.inverse( &tmp1_k_, &dzMUy_);
-
-
-
+    
+    
+    
     
     // Reynolds stresses -- added to at each step in the loop
     reynolds_stress_MPI_send_.setZero();
-
+    
     
     /////////////////////////////////////
     //   ALL OF THIS IS PARALLELIZED
@@ -208,233 +227,182 @@ void MHD_FullQlin::rhs(const double t, const double dt_lin,
         assign_laplacians_(i, t, 1); // Assign kx, lapF etc.
         
         // u_ and b_ arrays in Real Space:
-        // 0->ux, 1->uy, 2->uz, 3->dx(ux), 4->dx(uy), 5->dx(uz), 6->dy(ux), 7->dy(uy), 8->dy(uz)
+        // 0->ux, 1->uy, 2->uz, 3->dx(ux), 4->dx(uy), 5->dx(uz), 6->dy(ux), 7->dy(uy), 8->dy(uz), 9->div(u)
         
-        // Define uy, uz etc.,
-        fluct_y_ = ( (-kyctmp_*kxctmp_)*(*SolIn->pLin(i, 0)) +  K->kz*(*SolIn->pLin(i, 1)) )*ilap2tmp_;
-        fluct_z_ = ( -kxctmp_*K->kz*(*SolIn->pLin(i, 0)) -  kyctmp_*(*SolIn->pLin(i, 1)) )*ilap2tmp_;
+        // Linear variables are
+        // 0: rho, 1: vx, 2: vy, 3: vz, 4: bx, 5: jx
         
-        // Define derivatives and take ffts
+        // Define uy, uz etc.
+        
+        // Define derivatives and take ffts -- whole bunch of these are a bit pointless, since don't need to take fft to take x or y deriv... should change later!
         // u
-        tmp1_k_ = fft_.fac1D()*(*SolIn->pLin(i, 0)); // ux (only for reynolds stress)
+        tmp1_k_ = fft_.fac1D()*(*SolIn->pLin(i, 1)); // ux (only for reynolds stress)
         fft_.inverse( &tmp1_k_, u_+0);
-        tmp1_k_ = fft_.fac1D()*fluct_y_; // uy - (only for reynolds stress)
+        tmp1_k_ = fft_.fac1D()*(*SolIn->pLin(i, 2)); // uy - (only for reynolds stress)
         fft_.inverse( &tmp1_k_, u_+1);
-        tmp1_k_ = fft_.fac1D()*fluct_z_; // uz
+        tmp1_k_ = fft_.fac1D()*(*SolIn->pLin(i, 3)); // uz
         fft_.inverse( &tmp1_k_, u_+2);
-        tmp1_k_ = (fft_.fac1D()*kxctmp_)*(*SolIn->pLin(i, 0)); // dx(ux)
-        fft_.inverse( &tmp1_k_, u_+3); // dx(ux)
-        tmp1_k_ = (fft_.fac1D()*kxctmp_)*fluct_y_;// dx(uy)
-        fft_.inverse( &tmp1_k_, u_+4);
-        tmp1_k_ = (fft_.fac1D()*kxctmp_)*fluct_z_;// dx(uz)
-        fft_.inverse( &tmp1_k_, u_+5);
-        tmp1_k_ = (fft_.fac1D()*kyctmp_)*(*SolIn->pLin(i, 0)); // dy(ux)
-        fft_.inverse( &tmp1_k_, u_+6);
-        tmp1_k_ = (fft_.fac1D()*kyctmp_)*fluct_y_;// dy(uy)
-        fft_.inverse( &tmp1_k_, u_+7);
-        tmp1_k_ = (fft_.fac1D()*kyctmp_)*fluct_z_;// dy(uz)
-        fft_.inverse( &tmp1_k_, u_+8);
+        u_[3] = kxctmp_*u_[0];// dx(ux)
+        u_[4] = kxctmp_*u_[1];// dx(uy)
+        u_[5] = kxctmp_*u_[2];// dx(uz)
+        u_[6] = kyctmp_*u_[0];// dy(ux)
+        u_[7] = kyctmp_*u_[1];// dy(uy)
+        u_[8] = kyctmp_*u_[2];// dy(uz)
+        // And div(u) in real space
+        tmp1_k_ = fft_.fac1D()*(kxctmp_*(*SolIn->pLin(i, 1)) + kyctmp_*(*SolIn->pLin(i, 2)) + K->kz*(*SolIn->pLin(i, 3)));
+        fft_.inverse( &tmp1_k_, &divu_);
+//        cout << divu_.transpose().abs().sum() << endl;
+
+        
         
         // Define by, bz etc.,
-        fluct_y_ = ( (-kyctmp_*kxctmp_)*(*SolIn->pLin(i, 2)) +  K->kz*(*SolIn->pLin(i, 3)) )*ilap2tmp_;
-        fluct_z_ = ( -kxctmp_*K->kz*(*SolIn->pLin(i, 2)) -  kyctmp_*(*SolIn->pLin(i, 3)) )*ilap2tmp_;
+        b_y_ = ( (-kyctmp_*kxctmp_)*(*SolIn->pLin(i, 4)) +  K->kz*(*SolIn->pLin(i, 5)) )*ilap2tmp_;
+        b_z_ = ( -kxctmp_*K->kz*(*SolIn->pLin(i, 4)) -  kyctmp_*(*SolIn->pLin(i, 5)) )*ilap2tmp_;
         // b
-        tmp1_k_ = fft_.fac1D()*(*SolIn->pLin(i, 2)); // bx (only for reynolds stress)
+        tmp1_k_ = fft_.fac1D()*(*SolIn->pLin(i, 4)); // bx (only for reynolds stress)
         fft_.inverse( &tmp1_k_, b_+0);
-        tmp1_k_ = fft_.fac1D()*fluct_y_; // by - (only for reynolds stress)
+        tmp1_k_ = fft_.fac1D()*b_y_; // by - (only for reynolds stress)
         fft_.inverse( &tmp1_k_, b_+1);
-        tmp1_k_ = fft_.fac1D()*fluct_z_; // bz
+        tmp1_k_ = fft_.fac1D()*b_z_; // bz
         fft_.inverse( &tmp1_k_, b_+2);
-        tmp1_k_ = (fft_.fac1D()*kxctmp_)*(*SolIn->pLin(i, 2)); // dx(bx)
-        fft_.inverse( &tmp1_k_, b_+3);
-        tmp1_k_ = (fft_.fac1D()*kxctmp_)*fluct_y_;// dx(by)
-        fft_.inverse( &tmp1_k_, b_+4);
-        tmp1_k_ = (fft_.fac1D()*kxctmp_)*fluct_z_;// dx(bz)
-        fft_.inverse( &tmp1_k_, b_+5);
-        tmp1_k_ = (fft_.fac1D()*kyctmp_)*(*SolIn->pLin(i, 2)); // dy(bx)
-        fft_.inverse( &tmp1_k_, b_+6);
-        tmp1_k_ = (fft_.fac1D()*kyctmp_)*fluct_y_;// dy(by)
-        fft_.inverse( &tmp1_k_, b_+7);
-        tmp1_k_ = (fft_.fac1D()*kyctmp_)*fluct_z_;// dy(bz)
-        fft_.inverse( &tmp1_k_, b_+8);
+        b_[3] = kxctmp_*b_[0];
+        b_[4] = kxctmp_*b_[1];
+        b_[5] = kxctmp_*b_[2];
+        b_[6] = kyctmp_*b_[0];
+        b_[7] = kyctmp_*b_[1];
+        b_[8] = kyctmp_*b_[2];
+
+        
+        // Linear variables are
+        // 0: rho, 1: vx, 2: vy, 3: vz, 4: bx, 5: jx
         
         ///////////////////////////////////
-        //  Advance u and zeta
-        // Form u.grad(u)-b.grad(b) - put into (tmp1_k_,tmp2_k_,tmp3_k_)
-        // Ux dx(ux)+ Uy dy(ux) + uz dzUx
-        tmp1_z_ = MUx_*u_[3] + MUy_*u_[6] + u_[2]*dzMUx_ -
-                    L_mult_*(MBx_*b_[3] + MBy_*b_[6] + b_[2]*dzMBx_);
+        //  Advance rho
+        tmp1_k_ = fft_.fac1D()*(*SolIn->pLin(i, 0));
+        fft_.inverse( &tmp1_k_, &rho_); //  Real space rho
+        // U.Grho
+        tmp1_z_ = (MUx_*kxctmp_ + MUy_*kyctmp_)*rho_;
         fft_.forward(&tmp1_z_, &tmp1_k_);
-        // Ux dx(uy)+ Uy dy(uy) + uz dzUy
-        tmp1_z_ = MUx_*u_[4] + MUy_*u_[7] + u_[2]*dzMUy_ -
-                    L_mult_*(MBx_*b_[4] + MBy_*b_[7] + b_[2]*dzMBy_);
+        *SolOut->pLin(i, 0) = -tmp1_k_ - rho0_*(kxctmp_*(*SolIn->pLin(i, 1)) + kyctmp_*(*SolIn->pLin(i, 2)) + K->kz*(*SolIn->pLin(i, 3)));
+        
+//        cout << "kx,ky: " << kxtmp_ << ", " << kytmp_ << " t=" << t << endl;
+//        cout << rho_.real().transpose() << endl;
+        
+        ///////////////////////////////////
+        //  Advance u
+        // Form u.grad(u)-b.grad(b) - put into (tmp1_k_,tmp2_k_,tmp3_k_)
+        // Ux dx(ux)+ Uy dy(ux) + uz dzUx - Bterms
+        tmp1_z_ = MUx_*u_[3] + MUy_*u_[6] + u_[2]*dzMUx_ -  (MBx_*b_[3] + MBy_*b_[6] + b_[2]*dzMBx_ )/rho0_;
+        fft_.forward(&tmp1_z_, &tmp1_k_);
+        // Ux dx(uy)+ Uy dy(uy) + uz dzUy - Bterms
+        tmp1_z_ = MUx_*u_[4] + MUy_*u_[7] + u_[2]*dzMUy_ - (MBx_*b_[4] + MBy_*b_[7] + b_[2]*dzMBy_ )/rho0_;
         fft_.forward(&tmp1_z_, &tmp2_k_);
-        // Ux dx(uz) + Uy dy(uz)
-        tmp1_z_ = MUx_*u_[5] + MUy_*u_[8] - L_mult_*(MBx_*b_[5] + MBy_*b_[8]);
+        // Ux dx(uz) + Uy dy(uz)- Bterms
+        tmp1_z_ = MUx_*u_[5] + MUy_*u_[8] - (MBx_*b_[5] + MBy_*b_[8])/rho0_;
         fft_.forward(&tmp1_z_, &tmp3_k_);
-        // u and zeta dot
-        // u
-        *SolOut->pLin(i, 0) = (  (-2.0*kxctmp_*kyctmp_*q_)*(*SolIn->pLin(i, 0)) +  2*Omega_*K->kz*(*SolIn->pLin(i, 1))  +  (kxctmp_*kxctmp_)*tmp1_k_ + (kxctmp_*kyctmp_)*tmp2_k_ + kxctmp_*K->kz*tmp3_k_ )*ilapFtmp_   +  B0z_*K->kz*(*SolIn->pLin(i, 2))   -     tmp1_k_;
-        // zeta
-        *SolOut->pLin(i, 1) = (q_-2.0*Omega_)*K->kz*(*SolIn->pLin(i, 0))  + B0z_*K->kz*(*SolIn->pLin(i, 3)) -   (K->kz*tmp2_k_ - kyctmp_*tmp3_k_);
+        // Magnetic pressure b.B - take gradient in equations.
+        tmp1_z_ = MBx_*b_[0] + MBy_*b_[1] + B0z_*b_[2];
+        fft_.forward(&tmp1_z_, &tmp4_k_);
+        // u dot
+        *SolOut->pLin(i, 1) = - tmp1_k_ + 2.0*Omega_*(*SolIn->pLin(i, 2)) + B0z_/rho0_*K->kz*(*SolIn->pLin(i, 4))  - 1/rho0_*kxctmp_*(cs20_*(*SolIn->pLin(i, 0)) + tmp4_k_);
+        *SolOut->pLin(i, 2) = -tmp2_k_ + (q_-2.0*Omega_)*(*SolIn->pLin(i, 1)) + B0z_/rho0_*K->kz*b_y_ - 1/rho0_*kyctmp_*(cs20_*(*SolIn->pLin(i, 0)) + tmp4_k_);
+        *SolOut->pLin(i, 3) = -tmp3_k_  + B0z_/rho0_*K->kz*b_z_ - 1/rho0_*K->kz*(cs20_*(*SolIn->pLin(i, 0)) + tmp4_k_);
+        
+//        cout << (rho0_*K->kz*(cs20_*(*SolIn->pLin(i, 0)))).transpose() << endl;
+
+//        // As a test, clean divergence
+//        tmp4_k_ = ilapFtmp_*(kxctmp_*(*SolOut->pLin(i, 1)) + kyctmp_*(*SolOut->pLin(i, 2)) + K->kz*(*SolOut->pLin(i, 3)));
+//        (*SolOut->pLin(i, 1)) -=  kxctmp_*tmp4_k_;
+//        (*SolOut->pLin(i, 2)) -=  kyctmp_*tmp4_k_;
+//        (*SolOut->pLin(i, 3)) -=  K->kz*tmp4_k_;
+        
+        
         ////////////////////////////////
+        // u_ and b_ arrays in Real Space:
+        // 0->ux, 1->uy, 2->uz, 3->dx(ux), 4->dx(uy), 5->dx(uz), 6->dy(ux), 7->dy(uy), 8->dy(uz)
         ///////////////////////////////////
         //  Advance b and eta
         // Form u.grad(b)-b.grad(u)   - put into (tmp1_k_,tmp2_k_,tmp3_k_)
-        // Ux dx(bx)+ Uy dy(bx) + uz dzBx
-        tmp1_z_ = MUx_*b_[3] + MUy_*b_[6] + u_[2]*dzMBx_ -
-                    (MBx_*u_[3] + MBy_*u_[6] + b_[2]*dzMUx_);
+        // Ux dx(bx)+ Uy dy(bx) + uz dzBx - B.GU + B*div(u)
+        tmp1_z_ = MUx_*b_[3] + MUy_*b_[6] + u_[2]*dzMBx_ - (MBx_*u_[3] + MBy_*u_[6] + b_[2]*dzMUx_) + MBx_*divu_;
         fft_.forward(&tmp1_z_, &tmp1_k_);
-        // Ux dx(by)+ Uy dy(by) + uz dzBy
-        tmp1_z_ = MUx_*b_[4] + MUy_*b_[7] + u_[2]*dzMBy_ -
-                    (MBx_*u_[4] + MBy_*u_[7] + b_[2]*dzMUy_);
+        // Ux dx(by)+ Uy dy(by) + uz dzBy - B.GU + B*div(u)
+        tmp1_z_ = MUx_*b_[4] + MUy_*b_[7] + u_[2]*dzMBy_ - (MBx_*u_[4] + MBy_*u_[7] + b_[2]*dzMUy_) + MBy_*divu_;
         fft_.forward(&tmp1_z_, &tmp2_k_);
-        // Ux dx(bz) + Uy dy(bz)
-        tmp1_z_ = MUx_*b_[5] + MUy_*b_[8] - (MBx_*u_[5] + MBy_*u_[8]);
+        // Ux dx(bz) + Uy dy(bz) - B.GU + B*div(u)
+        tmp1_z_ = MUx_*b_[5] + MUy_*b_[8] - (MBx_*u_[5] + MBy_*u_[8])  +  B0z_*divu_;
         fft_.forward(&tmp1_z_, &tmp3_k_);
         // b and eta dot
         // b
-        *SolOut->pLin(i, 2) = B0z_*K->kz*(*SolIn->pLin(i, 0)) - tmp1_k_;
+        *SolOut->pLin(i, 4) = B0z_*K->kz*(*SolIn->pLin(i, 1)) - tmp1_k_;
         // eta
-        *SolOut->pLin(i, 3) = -q_*K->kz*(*SolIn->pLin(i, 2))  + B0z_*K->kz*(*SolIn->pLin(i, 1))  -   (K->kz*tmp2_k_ - kyctmp_*tmp3_k_);
+        *SolOut->pLin(i, 5) = -q_*K->kz*(*SolIn->pLin(i, 4))  + B0z_*K->kz*(K->kz*(*SolIn->pLin(i, 2)) - kyctmp_*(*SolIn->pLin(i, 3)))  -   (K->kz*tmp2_k_ - kyctmp_*tmp3_k_);
         
         
-        ///////////////////////////////////////
-        ///// REYNOLDS STRESS
-        // Chagned a little from other versions (MRIDSS)
-        // Here, calculate all FFTs before doing MPI all reduce (and also multiply by necessary factors and kz to take derivative). This allows only half of the dealiased vector to be sent (at the expense of more ffts, reducing the communication load by 2/3
-        
-        // mult_fac for sum - since no -ve ky values are used, count everything but ky=0 twice
-        double mult_fac = 2.0;
-        if (kytmp_== 0.0 )
-            mult_fac = 1.0; // Only count ky=0 mode once
-        
-        double ftfac = mult_fac*reynolds_stress_ft_fac; // Factor for summing all modes (1/(nx*ny)^2
-        
-        // Bx
-        // bz*ux-uz*bx
-        reynolds_z_tmp_ = ((b_[2]*u_[0].conjugate()).real()  -   (u_[2]*b_[0].conjugate()).real()).cast<dcmplx>();
-        // Back to Fourier space
-        fft_.forward(&reynolds_z_tmp_, &tmp1_k_);
-        // Add on to MPI send vector
-        reynolds_stress_MPI_send_.segment(0, num_to_mpi_send_) += ftfac*(K->kz*tmp1_k_).segment(0, num_to_mpi_send_);
-        
-        // By
-        // bz*uy-uz*by
-        reynolds_z_tmp_ = ((b_[2]*u_[1].conjugate()).real()  -   (u_[2]*b_[1].conjugate()).real()).cast<dcmplx>();
-        // Back to fourier space
-        fft_.forward(&reynolds_z_tmp_, &tmp1_k_);
-        // Add on to MPI send vector
-        reynolds_stress_MPI_send_.segment(num_to_mpi_send_, num_to_mpi_send_) += ftfac*(K->kz*tmp1_k_).segment(0, num_to_mpi_send_);
-        
-        // Ux
-        // -(ux dx(ux) + uy dy(ux) + uz dz(ux)) + (bx dx(bx) + by dy(bx) + bz dz(bx))
-        tmp1_k_ = fft_.fac1D()*K->kz*(*SolIn->pLin(i, 0)); // Need dz(ux)
-        tmp2_k_ = fft_.fac1D()*K->kz*(*SolIn->pLin(i, 2)); // Need dz(bx)
-        fft_.inverse(&tmp1_k_, &tmp1_z_); // Transforms
-        fft_.inverse(&tmp2_k_, &reynolds_z_tmp_);
-        reynolds_z_tmp_ = ( -((u_[0]*u_[3].conjugate()).real() + (u_[1]*u_[6].conjugate()).real() + (u_[2]*tmp1_z_.conjugate()).real() )   +
-                ((b_[0]*b_[3].conjugate()).real() + (b_[1]*b_[6].conjugate()).real() + (b_[2]*reynolds_z_tmp_.conjugate()).real() )  ).cast<dcmplx>();
-        // Back to Fourier space
-        fft_.forward(&reynolds_z_tmp_, &tmp1_k_);
-        // Add on to MPI send vector
-        reynolds_stress_MPI_send_.segment(2*num_to_mpi_send_, num_to_mpi_send_) += ftfac*tmp1_k_.segment(0, num_to_mpi_send_);
         
         
-        // Uy
-        // -(ux dx(uy) + uy dy(uy) + uz dz(uy)) + (bx dx(by) + by dy(by) + bz dz(by))
-        fluct_z_ = ( (-kyctmp_*kxctmp_)*(*SolIn->pLin(i, 0)) +  K->kz*(*SolIn->pLin(i, 1)) )*ilap2tmp_; // Redefine fluct_z to uy - fluct_y is already by
-        tmp1_k_ = fft_.fac1D()*K->kz*fluct_z_; // Need dz(uy)
-        tmp2_k_ = fft_.fac1D()*K->kz*fluct_y_; // Need dz(by)
-        fft_.inverse(&tmp1_k_, &tmp1_z_); // Transforms
-        fft_.inverse(&tmp2_k_, &reynolds_z_tmp_);
-        reynolds_z_tmp_ = ( -((u_[0]*u_[4].conjugate()).real() + (u_[1]*u_[7].conjugate()).real() + (u_[2]*tmp1_z_.conjugate()).real() )   +
-                        ((b_[0]*b_[4].conjugate()).real() + (b_[1]*b_[7].conjugate()).real() + (b_[2]*reynolds_z_tmp_.conjugate()).real() )  ).cast<dcmplx>();
-        // Back to real space
-        fft_.forward(&reynolds_z_tmp_, &tmp1_k_);
-        // Add on to MPI send vector
-        reynolds_stress_MPI_send_.segment(3*num_to_mpi_send_, num_to_mpi_send_) += ftfac*tmp1_k_.segment(0, num_to_mpi_send_);
+
         
-        
-        ///// END - REYNOLDS STRESS
-        ///////////////////////////////////////
+       
         
         ////////////////////////////////////////
         //////   LINEAR PART
         // Need to re-evaluate laplacian, since different time.
         kxtmp_=kxtmp_ + q_*dt_lin*kytmp_;
-        linOpFluct[i][0] = nu_*((-kxtmp_*kxtmp_-kytmp_*kytmp_)+ K->kz2);
-        linOpFluct[i][1] = linOpFluct[i][0];
-        linOpFluct[i][2]  = (eta_/nu_)*linOpFluct[i][0];// Saves some calculation
-        linOpFluct[i][3] = linOpFluct[i][2];
+        // Use lapFtmp_ to store Laplacian^Viscosity_order/2
+        lapFtmp_= -((-kxtmp_*kxtmp_-kytmp_*kytmp_)+ K->kz2).abs().pow(viscosity_order_/2);
+        linOpFluct[i][0] = kappa_*lapFtmp_;
+        linOpFluct[i][1] = nu_*lapFtmp_;
+        linOpFluct[i][2] = linOpFluct[i][1];
+        linOpFluct[i][3] = linOpFluct[i][1];
+        linOpFluct[i][4]  = eta_*lapFtmp_;
+        linOpFluct[i][5] = linOpFluct[i][4];
         
         ////////////////////////////////////////
         
         
+        
+        
+        
     }
-    //////////////////////////////////////
-    // Reynolds stress
-    // Sum accross all processes
 
-    mpi_.SumAllReduce_dcmplx(reynolds_stress_MPI_send_.data(), reynolds_stress_MPI_receive_.data(), num_MFs()*num_to_mpi_send_);
-    // Put into variables for MF update - flip to ensure realty
-    // Bx
-    Bx_drive_.segment(0, num_to_mpi_send_) = reynolds_stress_MPI_receive_.segment(0, num_to_mpi_send_);
-    Bx_drive_.segment(num_to_mpi_send_,num_to_mpi_send_-1) = reynolds_stress_MPI_receive_.segment(1, num_to_mpi_send_-1).reverse().conjugate();
-    // By
-    By_drive_.segment(0, num_to_mpi_send_) = reynolds_stress_MPI_receive_.segment(num_to_mpi_send_, num_to_mpi_send_);
-    By_drive_.segment(num_to_mpi_send_,num_to_mpi_send_-1) = reynolds_stress_MPI_receive_.segment(num_to_mpi_send_+1, num_to_mpi_send_-1).reverse().conjugate();
-    // Ux
-    Ux_drive_.segment(0, num_to_mpi_send_) = reynolds_stress_MPI_receive_.segment(2*num_to_mpi_send_, num_to_mpi_send_);
-    Ux_drive_.segment(num_to_mpi_send_,num_to_mpi_send_-1) = reynolds_stress_MPI_receive_.segment(2*num_to_mpi_send_+1, num_to_mpi_send_-1).reverse().conjugate();
-    // Uy
-    Uy_drive_.segment(0, num_to_mpi_send_) = reynolds_stress_MPI_receive_.segment(3*num_to_mpi_send_, num_to_mpi_send_);
-    Uy_drive_.segment(num_to_mpi_send_,num_to_mpi_send_-1) = reynolds_stress_MPI_receive_.segment(3*num_to_mpi_send_+1, num_to_mpi_send_-1).reverse().conjugate();
     
-    // Reynolds stress
+    // No Reynolds stress
     //////////////////////////////////////
     
     
-//    Bx_drive_.setZero();
-//    By_drive_.setZero();
-//    Ux_drive_.setZero();
-//    Uy_drive_.setZero();
     //////////////////////////////////////
     ////   MEAN FIELDS    ////////////////
     if (QL_YN_) {
-        // B update
-        *SolOut->pMF(1) = -q_*(*SolIn->pMF(0)) + B0z_*K->kz*(*SolIn->pMF(3)) + By_drive_;
-        *SolOut->pMF(0) = B0z_*K->kz*(*SolIn->pMF(2)) + Bx_drive_;
-        // U update
-        *SolOut->pMF(2) = 2*Omega_*(*SolIn->pMF(3)) + B0z_*K->kz*(*SolIn->pMF(0)) + Ux_drive_;
-        *SolOut->pMF(3) = (q_-2.0*Omega_)*(*SolIn->pMF(2)) + B0z_*K->kz*(*SolIn->pMF(1)) + Uy_drive_;
+        mpi_.print1("CompMHDIso_FixedMF is not set up for mean field evolution!!\n");
     } else { // Still calculate Reynolds stress in linear calculation
         SolOut->pMF(1)->setZero();
         SolOut->pMF(0)->setZero();
         SolOut->pMF(2)->setZero();
         SolOut->pMF(3)->setZero();
     }
-
+    
     
     
 }
 
-void MHD_FullQlin::linearOPs_Init(double t0, doubVec **linOpFluct, doubVec *linOpMF){
+void CompMHDIso_FixedMF::linearOPs_Init(double t0, doubVec **linOpFluct, doubVec *linOpMF){
     
     // Fluctuations
     for (int i=0; i<Dimxy(); ++i) {
         assign_laplacians_(i, t0, 0); // Assign kx, lapF etc.
-        linOpFluct[i][0] = nu_*lapFtmp_;
-        linOpFluct[i][1] = linOpFluct[i][0];
-        linOpFluct[i][2]  = (eta_/nu_)*linOpFluct[i][0];// Saves some calculation
-        linOpFluct[i][3] = linOpFluct[i][2];
+        // Use lapFtmp_ to store Laplacian^Viscosity_order/2
+        lapFtmp_= -lapFtmp_.abs().pow(viscosity_order_/2);
+        linOpFluct[i][0] = kappa_*lapFtmp_;
+        linOpFluct[i][1] = nu_*lapFtmp_;
+        linOpFluct[i][2] = linOpFluct[i][1];
+        linOpFluct[i][3] = linOpFluct[i][1];
+        linOpFluct[i][4]  = eta_*lapFtmp_;
+        linOpFluct[i][5] = linOpFluct[i][4];
     }
     // Mean fields
     if (QL_YN_) {
-        linOpMF[0]=eta_*K->kz2;
-        linOpMF[1]=eta_*K->kz2;
-        linOpMF[2]=nu_*K->kz2;
-        linOpMF[3]=nu_*K->kz2;
+        mpi_.print1("CompMHDIso_FixedMF is not set up for mean field evolution!!\n\n");
     } else {
         linOpMF[0].setZero();
         linOpMF[1].setZero();
@@ -442,7 +410,7 @@ void MHD_FullQlin::linearOPs_Init(double t0, doubVec **linOpFluct, doubVec *linO
         linOpMF[3].setZero();
     }
     
-
+    
 }
 
 
@@ -451,7 +419,7 @@ void MHD_FullQlin::linearOPs_Init(double t0, doubVec **linOpFluct, doubVec *linO
 //   Remapping
 // Remapping for the shearing box
 // Using the Lithwick method of continuously remapping wavenumbers when they become too large
-void MHD_FullQlin::ShearingBox_Remap(double qt, solution *sol){
+void CompMHDIso_FixedMF::ShearingBox_Remap(double qt, solution *sol){
     double kxLfac=2*PI/L(0);// Define these for clarity
     int nx = N(0)-1;
     
@@ -474,7 +442,7 @@ void MHD_FullQlin::ShearingBox_Remap(double qt, solution *sol){
 
 //////////////////////////////////////////////////////////
 //    ENERGY/MOMENTUM ETC.
-void MHD_FullQlin::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const solution *sol) {
+void CompMHDIso_FixedMF::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const solution *sol) {
     // Energy, angular momentum and dissipation of the solution MFin and Cin
     // TimeVariables class stores info and data about energy, AM etc.
     // t is time
@@ -512,26 +480,28 @@ void MHD_FullQlin::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const soluti
         
         lap2tmp_ = lapFtmp_*ilap2tmp_; // lap2tmp_ just a convenient storage
         
+        
         if (tv->energy_save_Q()){
             //////////////////////////////////////
             //     ENERGY
             
             // (NB: ilap2tmp_ is negative but want abs, just use -ilap2)
-            energy_u += mult_fac*(  lap2tmp_*( *(sol->pLin(i,0)) ).abs2() - ilap2tmp_*( *(sol->pLin(i,1)) ).abs2()  ).sum();
-            energy_b += mult_fac*(  lap2tmp_*( *(sol->pLin(i,2)) ).abs2() - ilap2tmp_*( *(sol->pLin(i,3)) ).abs2()  ).sum();
+            energy_u += mult_fac*rho0_*( (*(sol->pLin(i,1))).abs2() + (*(sol->pLin(i,2))).abs2() + (*(sol->pLin(i,3))).abs2() ).sum();
+            energy_b += mult_fac*(  lap2tmp_*( *(sol->pLin(i,4)) ).abs2() - ilap2tmp_*( *(sol->pLin(i,5)) ).abs2()  ).sum();
             //////////////////////////////////////
+//            cout << "kx,ky = " << kxtmp_ << "," << kytmp_ <<": " << ( (*(sol->pLin(i,1))).abs2() + (*(sol->pLin(i,2))).abs2() + (*(sol->pLin(i,3))).abs2() ).transpose() << endl;
             
-//            std::cout << "kx = " << kxtmp_ << ", ky = " << kytmp_ << ": " <<mult_fac*(  lap2tmp_*( *(sol->pLin(i,0)) ).abs2() - ilap2tmp_*( *(sol->pLin(i,1)) ).abs2()  ).sum() <<std::endl;
+            //            std::cout << "kx = " << kxtmp_ << ", ky = " << kytmp_ << ": " <<mult_fac*(  lap2tmp_*( *(sol->pLin(i,0)) ).abs2() - ilap2tmp_*( *(sol->pLin(i,1)) ).abs2()  ).sum() <<std::endl;
         }
         if (tv->AngMom_save_Q()){
             //////////////////////////////////////
             //   Angular momentum
             
-            fluct_y_ = ( (-kyctmp_*kxctmp_)*(*sol->pLin(i, 0)) +  K->kz*(*sol->pLin(i, 1)) )*ilap2tmp_;  //   Actually uy
-            fluct_z_ = ( (-kyctmp_*kxctmp_)*(*sol->pLin(i, 2)) +  K->kz*(*sol->pLin(i, 3)) )*ilap2tmp_;  //   Actually by
             
-            AM_u += mult_fac*( (*sol->pLin(i, 0))*fluct_y_.conjugate() ).real().sum();
-            AM_b += mult_fac*( (*sol->pLin(i, 2))*fluct_z_.conjugate() ).real().sum();
+            b_y_ = ( (-kyctmp_*kxctmp_)*(*sol->pLin(i, 4)) +  K->kz*(*sol->pLin(i, 5)) )*ilap2tmp_;  //   Actually by
+            
+            AM_u += mult_fac*( (*(sol->pLin(i,1)))*(*(sol->pLin(i,2))).conjugate() ).real().sum();
+            AM_b += mult_fac*( (*sol->pLin(i, 4))*b_y_.conjugate() ).real().sum();
             //
             //////////////////////////////////////
         }
@@ -539,10 +509,91 @@ void MHD_FullQlin::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const soluti
             //////////////////////////////////////
             //     DISSIPATION
             // (NB: ilap2tmp_ and lapFtmp_ are negative but want abs, just use negative)
-            diss_u += (mult_fac*nu_)*(  -lapFtmp_*( lap2tmp_*( *(sol->pLin(i,0)) ).abs2() - ilap2tmp_*( *(sol->pLin(i,1)) ).abs2() ) ).sum();
-            diss_b += (mult_fac*eta_)*(  -lapFtmp_*( lap2tmp_*( *(sol->pLin(i,2)) ).abs2() - ilap2tmp_*( *(sol->pLin(i,3)) ).abs2() ) ).sum();
+            diss_u += (mult_fac*nu_)*(  -lapFtmp_*( (*(sol->pLin(i,1))).abs2() + (*(sol->pLin(i,2))).abs2() + (*(sol->pLin(i,3))).abs2()  ) ).sum();
+            diss_b += (mult_fac*eta_)*(  -lapFtmp_*( lap2tmp_*( *(sol->pLin(i,4)) ).abs2() - ilap2tmp_*( *(sol->pLin(i,5)) ).abs2() ) ).sum();
             //
             //////////////////////////////////////
+        }
+        
+        if (tv->reynolds_save_Q()){
+            ///////////////////////////////////////
+            ///// REYNOLDS STRESS
+            // No MF evolution, so only calculate these when it's actually necessary
+            
+            double ftfac = mult_fac*reynolds_stress_ft_fac; // Factor for summing all modes (1/(nx*ny)^2
+            
+            // u
+            tmp1_k_ = fft_.fac1D()*(*sol->pLin(i, 1)); // ux
+            fft_.inverse( &tmp1_k_, u_+0);
+            tmp1_k_ = fft_.fac1D()*(*sol->pLin(i, 2)); // uy
+            fft_.inverse( &tmp1_k_, u_+1);
+            tmp1_k_ = fft_.fac1D()*(*sol->pLin(i, 3)); // uz
+            fft_.inverse( &tmp1_k_, u_+2);
+            // And div(u) in real space
+            tmp1_k_ = fft_.fac1D()*(kxctmp_*(*sol->pLin(i, 1)) + kyctmp_*(*sol->pLin(i, 2)) + K->kz*(*sol->pLin(i, 3)));
+            fft_.inverse( &tmp1_k_, &divu_);
+            
+            // Define by, bz etc.,
+            b_y_ = ( (-kyctmp_*kxctmp_)*(*sol->pLin(i, 4)) +  K->kz*(*sol->pLin(i, 5)) )*ilap2tmp_;
+            b_z_ = ( -kxctmp_*K->kz*(*sol->pLin(i, 4)) -  kyctmp_*(*sol->pLin(i, 5)) )*ilap2tmp_;
+            // b
+            tmp1_k_ = fft_.fac1D()*(*sol->pLin(i, 4)); // bx
+            fft_.inverse( &tmp1_k_, b_+0);
+            tmp1_k_ = fft_.fac1D()*b_y_; // by
+            fft_.inverse( &tmp1_k_, b_+1);
+            tmp1_k_ = fft_.fac1D()*b_z_; // bz
+            fft_.inverse( &tmp1_k_, b_+2);
+            
+            // Bx
+            // bz*ux-uz*bx
+            reynolds_z_tmp_ = ((b_[2]*u_[0].conjugate()).real()  -   (u_[2]*b_[0].conjugate()).real()).cast<dcmplx>();
+            // Back to Fourier space
+            fft_.forward(&reynolds_z_tmp_, &tmp1_k_);
+            // Add on to MPI send vector
+            reynolds_stress_MPI_send_.segment(0, num_to_mpi_send_) += ftfac*(K->kz*tmp1_k_).segment(0, num_to_mpi_send_);
+            
+            // By
+            // bz*uy-uz*by
+            reynolds_z_tmp_ = ((b_[2]*u_[1].conjugate()).real()  -   (u_[2]*b_[1].conjugate()).real()).cast<dcmplx>();
+            // Back to fourier space
+            fft_.forward(&reynolds_z_tmp_, &tmp1_k_);
+            // Add on to MPI send vector
+            reynolds_stress_MPI_send_.segment(num_to_mpi_send_, num_to_mpi_send_) += ftfac*(K->kz*tmp1_k_).segment(0, num_to_mpi_send_);
+            
+            // Ux -- probably a better way of working these out...
+            // -(ux dx(ux) + uy dy(ux) + uz dz(ux)) + (bx dx(bx) + by dy(bx) + bz dz(bx))
+            // Could use -dz(uz ux)+(ux divu) + dz(bz bx)instead
+            reynolds_z_tmp_ = (-u_[2]*u_[0].conjugate().real() + b_[2]*b_[0].conjugate().real()).cast<dcmplx>();
+            tmp1_z_ = (divu_*u_[0].conjugate()).real().cast<dcmplx>();
+            // Back to Fourier space
+            fft_.forward(&reynolds_z_tmp_, &tmp1_k_);
+            fft_.forward(&tmp1_z_, &tmp2_k_);
+            // Add on to MPI send vector
+            reynolds_stress_MPI_send_.segment(2*num_to_mpi_send_, num_to_mpi_send_) += ftfac*(K->kz*tmp1_k_ + tmp2_k_).segment(0, num_to_mpi_send_);
+            
+            
+            // Uy
+            // -(ux dx(uy) + uy dy(uy) + uz dz(uy)) + (bx dx(by) + by dy(by) + bz dz(by))
+            // Could use -dz(uz uy)+(uy divu) + dz(bz by)instead
+            reynolds_z_tmp_ = (-u_[2]*u_[1].conjugate().real() + b_[2]*b_[1].conjugate().real()).cast<dcmplx>();
+            tmp1_z_ = (divu_*u_[1].conjugate()).real().cast<dcmplx>();
+            // Back to Fourier space
+            fft_.forward(&reynolds_z_tmp_, &tmp1_k_);
+            fft_.forward(&tmp1_z_, &tmp2_k_);
+            // Add on to MPI send vector
+            reynolds_stress_MPI_send_.segment(3*num_to_mpi_send_, num_to_mpi_send_) += ftfac*(K->kz*tmp1_k_ + tmp2_k_).segment(0, num_to_mpi_send_);
+            
+            
+            ///// END - REYNOLDS STRESS
+            ///////////////////////////////////////
+            
+            
+//            //////////////////
+//            // TO DELETE!!!!
+//            tmp1_k_ = fft_.fac1D()*(*sol->pLin(i, 0));
+//            fft_.inverse( &tmp1_k_, &rho_); //  Real space rho
+//            energy_u += rho_.abs().sum();
+//            energy_b += divu_.abs().sum();
         }
         
         
@@ -552,9 +603,31 @@ void MHD_FullQlin::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const soluti
     
     // Put the everything on processor 0
     mpi_.SumReduce_doub(mpi_send_buff,mpi_receive_buff,num_to_mpi);
-    //    mpi_.SumReduce_IP_doub(&energy_u_f,1); // Is this working?
-    
 
+    if (tv->reynolds_save_Q()){
+        //////////////////////////////////////
+        // Reynolds stress
+        // Sum accross all processes
+        
+        mpi_.SumAllReduce_dcmplx(reynolds_stress_MPI_send_.data(), reynolds_stress_MPI_receive_.data(), num_MFs()*num_to_mpi_send_);
+        // Put into variables for MF update - flip to ensure realty
+        // Bx
+        Bx_drive_.segment(0, num_to_mpi_send_) = reynolds_stress_MPI_receive_.segment(0, num_to_mpi_send_);
+        Bx_drive_.segment(num_to_mpi_send_,num_to_mpi_send_-1) = reynolds_stress_MPI_receive_.segment(1, num_to_mpi_send_-1).reverse().conjugate();
+        // By
+        By_drive_.segment(0, num_to_mpi_send_) = reynolds_stress_MPI_receive_.segment(num_to_mpi_send_, num_to_mpi_send_);
+        By_drive_.segment(num_to_mpi_send_,num_to_mpi_send_-1) = reynolds_stress_MPI_receive_.segment(num_to_mpi_send_+1, num_to_mpi_send_-1).reverse().conjugate();
+        // Ux
+        Ux_drive_.segment(0, num_to_mpi_send_) = reynolds_stress_MPI_receive_.segment(2*num_to_mpi_send_, num_to_mpi_send_);
+        Ux_drive_.segment(num_to_mpi_send_,num_to_mpi_send_-1) = reynolds_stress_MPI_receive_.segment(2*num_to_mpi_send_+1, num_to_mpi_send_-1).reverse().conjugate();
+        // Uy
+        Uy_drive_.segment(0, num_to_mpi_send_) = reynolds_stress_MPI_receive_.segment(3*num_to_mpi_send_, num_to_mpi_send_);
+        Uy_drive_.segment(num_to_mpi_send_,num_to_mpi_send_-1) = reynolds_stress_MPI_receive_.segment(3*num_to_mpi_send_+1, num_to_mpi_send_-1).reverse().conjugate();
+        
+        // Reynolds stress
+        //////////////////////////////////////
+    }
+    
     // Currently, TimeVariables is set to save on root process, may want to generalize this at some point (SumReduce_doub is also)
     if (mpi_.my_n_v() == 0) {
         ////////////////////////////////////////////
@@ -623,39 +696,12 @@ void MHD_FullQlin::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const soluti
         if (tv->reynolds_save_Q()) {
             //////////////////////////////////////
             //   Reynolds stress
-            // Saves quantities to do with the reynolds stress and dynamo
-            // 1) Shear contribution: Re( -q Bx By)/|By|
-            // 2) y emf: Re( bzuy_m_uzby_c_*By )/|By|
-            // 3) y dissipation: eta*k^2*By
-            // 4) x emf: Re( bzux_m_uzbx_c_*Bx )/|Bx|
-            // 5) x dissipation: eta*k^2*Bx
-            // Have assumed k0 to be lowest kz! i.e., driving largest dynamo possible in the box
-            // There may be slight errors here from saving using the updated values of MFin, presumably this is a small effect, especially at high resolution (low dt) and in steady state.
+            //  Saves the stress on each of Bx, By, Ux, Uy in this order. Each is normalized by the rms mean-field amplitude
             double* rey_point = tv->current_reynolds();
             
             if (!save_full_reynolds_){
-                // FOR MEASURING DYNAMO IN FIXED B - k1 is wavelength of B
-                // NB: Had a mistake before, was 1/sqrt(sol->pMF(1)->abs2().sum()) rather than 1/(sol->pMF(1)->abs2().sum()). This makes the answer depend on the chosen value of the imposed field.
-//                
-//                // Alpha effect (mean zero) - alpha_yy*k1^2
-//                rey_point[0] = (Bx_drive_*K->kz*sol->pMF(1)->conjugate()).real().sum()/(sol->pMF(1)->abs2().sum());
-//                // Shear current - k1^2*eta_yx
-//                rey_point[1] = (Bx_drive_*sol->pMF(1)->conjugate()).real().sum()/(sol->pMF(1)->abs2().sum());
-//                // Turbulent By diffusion - -k1^2*eta_yy
-//                rey_point[2] = (By_drive_*sol->pMF(1)->conjugate()).real().sum()/(sol->pMF(1)->abs2().sum());
-//                // Bx nonzero
-//                // Off diagonal - k1^2*eta_xy
-//                rey_point[3] = (By_drive_*sol->pMF(0)->conjugate()).real().sum()/(sol->pMF(0)->abs2().sum());
-//                // Turbulent Bx diffusion - -k1^2*eta_xx
-//                rey_point[4] = (Bx_drive_*sol->pMF(0)->conjugate()).real().sum()/sol->pMF(0)->abs2().sum();
-                
-                
-                
-                
                 // Measuring Channel modes - keep B and U stresses
-                // Alpha effect (mean zero) - alpha_yy*k1^2
-//                rey_point[0] = (Bx_drive_*K->kz*sol->pMF(1)->conjugate()).real().sum()/sqrt(sol->pMF(1)->abs2().sum());
-                // Bx driving/damping
+                // By driving/damping
                 rey_point[0] = (Bx_drive_*sol->pMF(0)->conjugate()).real().sum()/sqrt(sol->pMF(0)->abs2().sum());
                 // By driving/damping
                 rey_point[1] = (By_drive_*sol->pMF(1)->conjugate()).real().sum()/sqrt(sol->pMF(1)->abs2().sum());
@@ -666,7 +712,6 @@ void MHD_FullQlin::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const soluti
                 rey_point[3] = (Uy_drive_*sol->pMF(3)->conjugate()).real().sum()/sqrt(sol->pMF(3)->abs2().sum());
             } else {
                 // SAVE FULL NONLINEAR STRESS DATA
-                // Only saving B data for now
                 fft_.inverse( &Bx_drive_, &reynolds_z_tmp_);
                 for (int jj=0; jj<NZfull(); ++jj) {
                     rey_point[jj] = real(reynolds_z_tmp_(jj))*fft_.fac1D();
@@ -675,20 +720,16 @@ void MHD_FullQlin::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const soluti
                 for (int jj=0; jj<NZfull(); ++jj) {
                     rey_point[jj+NZfull()] = real(reynolds_z_tmp_(jj))*fft_.fac1D();
                 }
-                
-                
-
-
-//                fft_.inverse( &Ux_drive_, &reynolds_z_tmp_);
-//                for (int i=2*NZfull(); i<3*NZfull(); ++i) {
-//                    rey_point[i] = reynolds_z_tmp_(i).real()*fft_.fac1D();
-//                }
-//                fft_.inverse( &Uy_drive_, &reynolds_z_tmp_);
-//                for (int i=3*NZfull(); i<4*NZfull(); ++i) {
-//                    rey_point[i] = reynolds_z_tmp_(i).real()*fft_.fac1D();
-//                }
+                fft_.inverse( &Ux_drive_, &reynolds_z_tmp_);
+                for (int jj=0; jj<NZfull(); ++jj) {
+                    rey_point[jj+2*NZfull()] = real(reynolds_z_tmp_(jj))*fft_.fac1D();
+                }
+                fft_.inverse( &Uy_drive_, &reynolds_z_tmp_);
+                for (int jj=0; jj<NZfull(); ++jj) {
+                    rey_point[jj+3*NZfull()] = real(reynolds_z_tmp_(jj))*fft_.fac1D();
+                }
             }
-
+            
             //////////////////////////////////////
             
             
@@ -700,8 +741,8 @@ void MHD_FullQlin::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const soluti
     tv->finish_timing();
     
     mpi_.BroadcastFromNode0_doub(tv->etaK_times_kmax, 2);
-//    if ( tv->etaK_times_kmax[0]<0.5 ||  tv->etaK_times_kmax[1]<0.5)
-//        mpi_.print1("Warning: eta_K is not well resolved by spatial grid!!!\n");
+    //    if ( tv->etaK_times_kmax[0]<0.5 ||  tv->etaK_times_kmax[1]<0.5)
+    //        mpi_.print1("Warning: eta_K is not well resolved by spatial grid!!!\n");
     
     
 }
@@ -709,7 +750,7 @@ void MHD_FullQlin::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const soluti
 
 //////////////////////////////////////////////////////////
 //   AUXILIARY FUNCTIONS
-inline void MHD_FullQlin::assign_laplacians_(int i, double t, bool need_inverse){
+inline void CompMHDIso_FixedMF::assign_laplacians_(int i, double t, bool need_inverse){
     ind_ky_ = K->ky_index[i];
     // Form Laplacians using time-dependent kx
     kyctmp_ = K->ky[i];
@@ -729,7 +770,7 @@ inline void MHD_FullQlin::assign_laplacians_(int i, double t, bool need_inverse)
 
 
 
-void MHD_FullQlin::print_noise_range_(){
+void CompMHDIso_FixedMF::print_noise_range_(){
     // Print out total number of driven modes
     int tot_count = 0, driv_count = 0;
     int tot_count_all = 0, driv_count_all = 0;// MPI reduced versions
@@ -756,8 +797,8 @@ void MHD_FullQlin::print_noise_range_(){
 
 //////////////////////////
 // CFL number
-double MHD_FullQlin::Calculate_CFL(const solution *sol)  {
-// Returns CFL/dt to calculate dt - in this case CFL/dt = kmax By + q
+double CompMHDIso_FixedMF::Calculate_CFL(const solution *sol)  {
+    // Returns CFL/dt to calculate dt - in this case CFL/dt = kmax By + q + kmax*cs
     
     // Mean fields have been previously calculated, so may as well use them
     double Bxmax = sqrt(MBx_.abs2().maxCoeff());
@@ -765,7 +806,7 @@ double MHD_FullQlin::Calculate_CFL(const solution *sol)  {
     double Uxmax = sqrt(MUx_.abs2().maxCoeff());
     double Uymax = sqrt(MUy_.abs2().maxCoeff());
     // CFL
-    return kmax*(Bymax + Bxmax + Uxmax + Uymax) + q_;
+    return kmax*(Bymax + Bxmax + Uxmax + Uymax) + q_ + kmax*sqrt(cs20_);
     
 }
 
@@ -773,13 +814,10 @@ double MHD_FullQlin::Calculate_CFL(const solution *sol)  {
 
 //////////////////////////////////////////////////////////
 //   DRIVING NOISE
-void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
+void CompMHDIso_FixedMF::DrivingNoise(double t, double dt, solution *sol) {
     // NZ() is now dealiased NZ!!!
     // So - drive all of NZ and Nyquist frequency is not included
-    
-    // Scale the magnetic driving by the value of the mean-field - tangling of the mean-field (see Yousef et al)
-    // 0 turns this off, non-zero is the proportionality
-    double drive_mag_mult = 1.0; // Scaling magnetic noise
+
     
     // Adds noise onto linear part of solution
     for (int i=0; i<Dimxy(); ++i) {
@@ -788,7 +826,7 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             
             ///////////////////////////
             // Noise multipliers
-            assign_laplacians_(i,t,0); // Assign laplacian's - no inverses
+            assign_laplacians_(i,t,1); // Assign laplacian's 
             
             // ky=0 so not many if statements
             double noise_multfac = dt*totalN2_*mult_noise_fac_; // f_noise is included in normal distribution
@@ -803,35 +841,74 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             double *multU_pnt = lapFtmp_.data();
             double *multZeta_pnt = lap2tmp_.data();
             bool *drive_cond_pnt = drive_condition_.data();
-
+            
             /////////////////////////////
             
+            // In the compressible case, since we want to clean the divergence from the noise before adding it into u, generate noise into tmp1_k_, tmp2_k_ etc., then clean divergence, then add into u
+            // ky != 0 modes are completely random
+            // Ux
+//            tmp1_k_.setConstant(0.0);
+//            tmp2_k_.setConstant(0.0);
+//            tmp3_k_.setConstant(0.0);
+//            dcmplx* ePoint = tmp1_k_.data();
+//            for (int jj=0; jj<NZ(); ++jj) {
+//                if (drive_cond_pnt[jj] && !drive_only_magnetic_fluctuations_)
+//                    ePoint[jj] = noise_multfac*dcmplx(ndist_(mt_), ndist_(mt_));
+//            }
+//            // Uy
+//            ePoint = tmp2_k_.data();
+//            for (int jj=0; jj<NZ(); ++jj) {
+//                if (drive_cond_pnt[jj] && !drive_only_magnetic_fluctuations_)
+//                    ePoint[jj] = noise_multfac*dcmplx(ndist_(mt_), ndist_(mt_));
+//            }
+//            // Uz
+//            ePoint = tmp3_k_.data();
+//            for (int jj=0; jj<NZ(); ++jj) {
+//                if (drive_cond_pnt[jj] && !drive_only_magnetic_fluctuations_)
+//                    ePoint[jj] = noise_multfac*dcmplx(ndist_(mt_), ndist_(mt_));
+//            }
+//            
+//            // Clean divergence from noise and add onto U
+//            tmp4_k_ = ilapFtmp_*(kxctmp_*tmp1_k_ + kyctmp_*tmp2_k_ + K->kz*tmp3_k_);
+//            *(sol->pLin(i,1) ) += tmp1_k_ - kxctmp_*tmp4_k_;
+//            *(sol->pLin(i,2) ) += tmp2_k_ - kyctmp_*tmp4_k_;
+//            *(sol->pLin(i,3) ) += tmp3_k_ - K->kz*tmp4_k_;
+            
+            
+            // TEMPORARY VERSION - actually, maybe this is better anyway?
+            // This version calculates vy and vz noise from zeta, so as to compare with incompressible version
             // ky != 0 modes are completely random
             // U
-            dcmplx* ePoint = (*(sol->pLin(i,0) )).data();
+            tmp1_k_.setZero();
+            tmp2_k_.setZero();
+            dcmplx* ePoint = tmp1_k_.data();
             for (int jj=0; jj<NZ(); ++jj) {
                 if (drive_cond_pnt[jj] && !drive_only_magnetic_fluctuations_)
-                    ePoint[jj] += multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                    ePoint[jj] = multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
             }
             // zeta
-            ePoint = (*(sol->pLin(i,1) )).data();
+            ePoint = tmp2_k_.data();
             for (int jj=0; jj<NZ(); ++jj) {
                 if (drive_cond_pnt[jj] && !drive_only_magnetic_fluctuations_)
-                    ePoint[jj] += multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                    ePoint[jj] = multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
             }
-//            cout << (*(sol->pLin(i,1) )).transpose() << endl;
+//            cout << tmp2_k_.transpose() << endl;
+
+            *(sol->pLin(i,1) ) += tmp1_k_;
+            *(sol->pLin(i,2) ) += ( (-kyctmp_*kxctmp_)*tmp1_k_ +  K->kz*tmp2_k_ )*ilap2tmp_;
+            *(sol->pLin(i,3) ) += ( -kxctmp_*K->kz*tmp1_k_ -  kyctmp_*tmp2_k_ )*ilap2tmp_;
             
             // b
-            ePoint = (*(sol->pLin(i,2) )).data();
+            ePoint = (*(sol->pLin(i,4) )).data();
             for (int jj=0; jj<NZ(); ++jj) {
                 if (drive_cond_pnt[jj] && !drive_only_velocity_fluctuations_)
-                    ePoint[jj] += drive_mag_mult*multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                    ePoint[jj] += multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
             }
             // eta
-            ePoint = (*(sol->pLin(i,3) )).data();
+            ePoint = (*(sol->pLin(i,5) )).data();
             for (int jj=0; jj<NZ(); ++jj) {
                 if (drive_cond_pnt[jj] && !drive_only_velocity_fluctuations_)
-                    ePoint[jj] += drive_mag_mult*multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                    ePoint[jj] += multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
             }
         }
         
@@ -862,7 +939,7 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             ///////////////////////////
             // Noise multipliers
             
-            assign_laplacians_(i,t,0); // Assign laplacian's - no inverses
+            assign_laplacians_(i,t,1); // Assign laplacian's - no inverses
             
             double noise_multfac = dt*totalN2_*mult_noise_fac_; // f_noise is included in normal distribution
             lap2tmp_(0) = 0.0; // Don't drive ky=kz=0 (not really necessary)
@@ -878,11 +955,13 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             double *multZeta_pnt = lap2tmp_.data();
             bool *drive_cond_pnt = drive_condition_.data();
             /////////////////////////////
-            
             // Make some noise - add to current k value
             noise_buff_.setZero();
+            // Use tmp1_k_ etc. to store noise so that divergence constraint can be enforced on the noise. I.e., tmp1_k and tmp2_k act just like u and zeta until right at the end, after all of the message passing
+            tmp1_k_.setZero();
+            tmp2_k_.setZero();
             dcmplx* noise_buff_dat_ = noise_buff_.data();
-            dcmplx* ePoint = (*(sol->pLin(i,0) )).data();
+            dcmplx* ePoint = tmp1_k_.data();
             for (int jj=1; jj<NZ(); ++jj){
                 if (drive_cond_pnt[jj] && !drive_only_magnetic_fluctuations_){
                     noise_buff_dat_[jj-1]=multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
@@ -891,34 +970,39 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             }
             // zeta
             noise_buff_dat_ += noise_buff_len_;
-            ePoint = (*(sol->pLin(i,1) )).data();
+            ePoint = tmp2_k_.data();
             for (int jj=1; jj<NZ(); ++jj){
                 if (drive_cond_pnt[jj] && !drive_only_magnetic_fluctuations_){
                     noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
                     ePoint[jj] += noise_buff_dat_[jj-1];
                 }
             }
+            // Assign u and zeta noise to ux, uy, uz
+            *(sol->pLin(i,1) ) += tmp1_k_;
+            *(sol->pLin(i,2) ) += ( (-kyctmp_*kxctmp_)*tmp1_k_ +  K->kz*tmp2_k_ )*ilap2tmp_;
+            *(sol->pLin(i,3) ) += ( -kxctmp_*K->kz*tmp1_k_ -  kyctmp_*tmp2_k_ )*ilap2tmp_;
+            
             // b
             noise_buff_dat_ += noise_buff_len_;
-            ePoint = (*(sol->pLin(i,2) )).data();
+            ePoint = (*(sol->pLin(i,4) )).data();
             for (int jj=1; jj<NZ(); ++jj){
                 if (drive_cond_pnt[jj] && !drive_only_velocity_fluctuations_){
-                    noise_buff_dat_[jj-1]=drive_mag_mult*multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                    noise_buff_dat_[jj-1]=multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
                     ePoint[jj] += noise_buff_dat_[jj-1];
                 }
             }
             // eta
             noise_buff_dat_ += noise_buff_len_;
-            ePoint = (*(sol->pLin(i,3) )).data();
+            ePoint = (*(sol->pLin(i,5) )).data();
             for (int jj=1; jj<NZ(); ++jj){
                 if (drive_cond_pnt[jj] && !drive_only_velocity_fluctuations_){
-                    noise_buff_dat_[jj-1]=drive_mag_mult*multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                    noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
                     ePoint[jj] += noise_buff_dat_[jj-1];
                 }
             }
             
             // Send data
-            mpi_.Send_dcmplx(noise_buff_.data(), num_Lin()*noise_buff_len_, *(K->i_sp), *(K->i_tosend));
+            mpi_.Send_dcmplx(noise_buff_.data(), num_noise_vars_*noise_buff_len_, *(K->i_sp), *(K->i_tosend));
             
             //        cout << "(kx,ky)=(" << K->kx[i] <<"," << K->ky[i] << ")" << endl;
             //        cout << noise_buff_.segment(0, nz).transpose() << endl<<endl;
@@ -929,21 +1013,32 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
         ////////////////////////////////////////////
         // Recieving
         while (K->i_fp < K->match_kx_from_p.end()) {
-            
             int i = *(K->i_loc);
             // Receive data from matching call
-            mpi_.Recv_dcmplx(noise_buff_.data(), num_Lin()*noise_buff_len_, *(K->i_fp), *(K->i_from));
+            mpi_.Recv_dcmplx(noise_buff_.data(), num_noise_vars_*noise_buff_len_, *(K->i_fp), *(K->i_from));
             
             // Flip noise around
-            for (int nV=0; nV<num_Lin(); ++nV) {
+            for (int nV=0; nV<num_noise_vars_; ++nV) {
                 noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).reverseInPlace();
             }
-
-            // Add to solution
-            for (int nV=0; nV<num_Lin(); ++nV) {
-                (*(sol->pLin(i,nV) )).segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
-            }
             
+
+            tmp1_k_.setZero();
+            tmp2_k_.setZero();
+            { // Loop through each variable
+                int nV=0;
+                tmp1_k_.segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
+                ++nV;
+                tmp2_k_.segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
+                ++nV;
+                (*(sol->pLin(i,4) )).segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
+                ++nV;
+                (*(sol->pLin(i,5) )).segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
+            }
+            // Assign u and zeta noise to ux, uy, uz
+            *(sol->pLin(i,1) ) += tmp1_k_;
+            *(sol->pLin(i,2) ) += ( (-kyctmp_*kxctmp_)*tmp1_k_ +  K->kz*tmp2_k_ )*ilap2tmp_;
+            *(sol->pLin(i,3) ) += ( -kxctmp_*K->kz*tmp1_k_ -  kyctmp_*tmp2_k_ )*ilap2tmp_;
             
             // Update iterators
             ++(K->i_fp);
@@ -960,7 +1055,7 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             ///////////////////////////
             // Noise multipliers
             int i = *(K->i_tosend); // index
-            assign_laplacians_(i,t,0); // Assign laplacian's - no inverses
+            assign_laplacians_(i,t,1); // Assign laplacian's - no inverses
             
             double noise_multfac = dt*totalN2_*mult_noise_fac_; // f_noise is included in normal distribution
             lap2tmp_(0) = 0.0; // Don't drive ky=kz=0
@@ -977,10 +1072,12 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             bool *drive_cond_pnt = drive_condition_.data();
             /////////////////////////////
             
-            // Make some noise - add to current k value
             noise_buff_.setZero();
+            // Make some noise - add to current k value
+            tmp1_k_.setZero();
+            tmp2_k_.setZero();
             dcmplx* noise_buff_dat_ = noise_buff_.data();
-            dcmplx* ePoint = (*(sol->pLin(i,0) )).data();
+            dcmplx* ePoint = tmp1_k_.data();
             for (int jj=1; jj<NZ(); ++jj){
                 if (drive_cond_pnt[jj] && !drive_only_magnetic_fluctuations_){
                     noise_buff_dat_[jj-1]=multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
@@ -989,28 +1086,33 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             }
             // zeta
             noise_buff_dat_ += noise_buff_len_;
-            ePoint = (*(sol->pLin(i,1) )).data();
+            ePoint = tmp2_k_.data();
             for (int jj=1; jj<NZ(); ++jj){
                 if (drive_cond_pnt[jj] && !drive_only_magnetic_fluctuations_){
                     noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
                     ePoint[jj] += noise_buff_dat_[jj-1];
                 }
             }
+            // Assign u and zeta noise to ux, uy, uz
+            *(sol->pLin(i,1) ) += tmp1_k_;
+            *(sol->pLin(i,2) ) += ( (-kyctmp_*kxctmp_)*tmp1_k_ +  K->kz*tmp2_k_ )*ilap2tmp_;
+            *(sol->pLin(i,3) ) += ( -kxctmp_*K->kz*tmp1_k_ -  kyctmp_*tmp2_k_ )*ilap2tmp_;
+            
             // b
             noise_buff_dat_ += noise_buff_len_;
-            ePoint = (*(sol->pLin(i,2) )).data();
+            ePoint = (*(sol->pLin(i,4) )).data();
             for (int jj=1; jj<NZ(); ++jj){
                 if (drive_cond_pnt[jj] && !drive_only_velocity_fluctuations_){
-                    noise_buff_dat_[jj-1]=drive_mag_mult*multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                    noise_buff_dat_[jj-1]=multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
                     ePoint[jj] += noise_buff_dat_[jj-1];
                 }
             }
             // eta
             noise_buff_dat_ += noise_buff_len_;
-            ePoint = (*(sol->pLin(i,3) )).data();
+            ePoint = (*(sol->pLin(i,5) )).data();
             for (int jj=1; jj<NZ(); ++jj){
                 if (drive_cond_pnt[jj] && !drive_only_velocity_fluctuations_){
-                    noise_buff_dat_[jj-1]=drive_mag_mult*multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
+                    noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
                     ePoint[jj] += noise_buff_dat_[jj-1];
                 }
             }
@@ -1020,14 +1122,27 @@ void MHD_FullQlin::DrivingNoise(double t, double dt, solution *sol) {
             i = *(K->i_loc);
             
             // Flip noise around
-            for (int nV=0; nV<num_Lin(); ++nV) {
+            for (int nV=0; nV<num_noise_vars_; ++nV) {
                 noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).reverseInPlace();
             }
             
-            // Add to solution
-            for (int nV=0; nV<num_Lin(); ++nV) {
-                (*(sol->pLin(i,nV) )).segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
+            
+            tmp1_k_.setZero();
+            tmp2_k_.setZero();
+            { // Loop through each variable
+                int nV=0;
+                tmp1_k_.segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
+                ++nV;
+                tmp2_k_.segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
+                ++nV;
+                (*(sol->pLin(i,4) )).segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
+                ++nV;
+                (*(sol->pLin(i,5) )).segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
             }
+            // Assign u and zeta noise to ux, uy, uz
+            *(sol->pLin(i,1) ) += tmp1_k_;
+            *(sol->pLin(i,2) ) += ( (-kyctmp_*kxctmp_)*tmp1_k_ +  K->kz*tmp2_k_ )*ilap2tmp_;
+            *(sol->pLin(i,3) ) += ( -kxctmp_*K->kz*tmp1_k_ -  kyctmp_*tmp2_k_ )*ilap2tmp_;
             
             
             // Update iterators

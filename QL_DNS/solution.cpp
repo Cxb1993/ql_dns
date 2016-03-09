@@ -51,12 +51,14 @@ void solution::Initial_Conditions(Inputs &SP,fftwPlans &fft, Model *eqs, MPIdata
     //  LINEAR FIELDS
     for (int i=0; i<nxy_; ++i) {
         for (int j=0; j<nLin_; ++j) {
-            linear_field_[i][j].setConstant(0.0);
+            linear_field_[i][j].setConstant(0.0);         
         }
     }
+//    linear_field_[3][6](0)=0.1;
+//    linear_field_[0][7](nz_-1)=0.1;
     //  Random Initial conditions in the linear fields - use the DrivingNoise routines
-    double init_k_range[2] = {0, 4000.0};
-    double init_amp = 0; // Standard deviation of the initial conditions
+    double init_k_range[2] = {0, 100.};
+    double init_amp = 0.1; // Standard deviation of the initial conditions
     // Reset model to produce driving noise like this
     eqs->ChangeNoiseRange(1.0, init_k_range[0], init_k_range[1]);
     // Add on noise to solution (which is zero)
@@ -92,32 +94,32 @@ void solution::Initial_Conditions(Inputs &SP,fftwPlans &fft, Model *eqs, MPIdata
     double mult_fac;
 //    if (SP.initial_By > 0.0) { // Lowest Kz mode in the box, amplitude from SP.initial_By
     int BxBy = 1; // Choice of Bx (0) or By (1)
-    if (SP.initial_By > 0.0) {//BxBy=1;} // If less than 0 use Bx
+    if (SP.initial_By >= 0.0) {//BxBy=1;} // If less than 0 use Bx
     
-        for (int i=0; i<nMF_; ++i) {
-            if (i==BxBy) { // Amplitude specified here, start By 10* larger than other(s)
-                mult_fac = fabs(SP.initial_By);
-                for (int k=0; k<nz_full_; ++k) {
-                    meanf_r[i](k) = (dcmplx) mult_fac*cos( MODE*zg(k) );
-                }
-            } else {
-                mult_fac = -0.0*SP.initial_By;
-                for (int k=0; k<nz_full_; ++k) {
-                    meanf_r[i](k) = (dcmplx) mult_fac*cos( MODE*zg(k) );
-                }
-            }
-            
-        }
-//        mult_fac= -SP.initial_By;
 //        for (int i=0; i<nMF_; ++i) {
-//            for (int k=0; k<nz_full_; ++k) {
-//                if (i==0) meanf_r[i](k) = (dcmplx) -0.6*mult_fac*cos( MODE*zg(k) );//Bx
-//                if (i==1) meanf_r[i](k) = (dcmplx) mult_fac*cos( MODE*zg(k) ); //By
-//                if (i==2) meanf_r[i](k) = (dcmplx) -0.4*mult_fac*sin( MODE*zg(k) ); //Ux
-//                if (i==3) meanf_r[i](k) = (dcmplx) -0.4*mult_fac*sin( MODE*zg(k) ); //Uy
+//            if (i==BxBy) { // Amplitude specified here, start By 10* larger than other(s)
+//                mult_fac = fabs(SP.initial_By);
+//                for (int k=0; k<nz_full_; ++k) {
+//                    meanf_r[i](k) = (dcmplx) mult_fac*cos( MODE*zg(k) );
+//                }
+//            } else {
+//                mult_fac = -0.0*SP.initial_By;
+//                for (int k=0; k<nz_full_; ++k) {
+//                    meanf_r[i](k) = (dcmplx) mult_fac*cos( MODE*zg(k) );
+//                }
 //            }
+//            
 //        }
-//
+        mult_fac= SP.initial_By;
+        for (int i=0; i<nMF_; ++i) {
+            for (int k=0; k<nz_full_; ++k) {
+                if (i==0) meanf_r[i](k) = (dcmplx) -mult_fac*cos( MODE*zg(k) );//Bx
+                if (i==1) meanf_r[i](k) = (dcmplx) mult_fac*cos( MODE*zg(k) ); //By
+                if (i==2) meanf_r[i](k) = (dcmplx) -sqrt(3./5.)*mult_fac*sin( MODE*zg(k) ); //Ux
+                if (i==3) meanf_r[i](k) = (dcmplx) -sqrt(3./5.)*mult_fac*sin( MODE*zg(k) ); //Uy
+            }
+        }
+
     } else {// If initial_By<0, all MFs nonzero, random with specified amplitude
         for (int i=0; i<nMF_; ++i) {
             

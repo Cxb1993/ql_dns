@@ -59,6 +59,7 @@ Kdata::Kdata(Model *mod, MPIdata *mpi){
         kx_index[i] = kx_index_full[k_i];
     }
 
+
     
     ///////////////////////////////////////////
     // kz and kz^2 arrays

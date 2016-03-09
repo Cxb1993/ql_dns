@@ -48,9 +48,15 @@ public:
     
     // Mean magnetic field
     double B0z;
+    // Mean density for compressible models
+    double rho0;
+    double P0;
+    double deltaP0; // Background anisotropy Pp-Pl
     // Dissipation
     double nu;   // Viscosity
     double eta;   // Resisitivity - could ignore for hydrodynamic
+    double kappa; // rho and P dissipation, can ignore for incompressible models
+    double viscosity_order; // Order of the dissipation terms k^n
     // Shear
     double q;  // Shear rate
     double omega; // Rotation rate

@@ -85,10 +85,17 @@ Inputs::Inputs(const MPIdata& mpi, const std::string& input_file_name): mpi_node
         // Other physical parameters: nu, eta, q, f_noise
         nu = Read_From_Input_File_<double>("nu_",fullfile,0.01);
         eta = Read_From_Input_File_<double>("eta_",fullfile,0.01);
+        kappa = Read_From_Input_File_<double>("kappa_",fullfile,0.0);
+        viscosity_order = Read_From_Input_File_<int>("viscosity_order_",fullfile,2);
+        // Shear parameters
         q = Read_From_Input_File_<double>("q_",fullfile, 1.5);
         omega = Read_From_Input_File_<double>("omega_",fullfile, 1.0);
         // Mean B fields
         B0z = Read_From_Input_File_<double>("B0z_", fullfile, 0.0);
+        // Mean density and sound speed for compressible models
+        rho0 = Read_From_Input_File_<double>("rho0_", fullfile, 1.0);
+        P0 = Read_From_Input_File_<double>("P0_", fullfile, 1.0);
+        deltaP0 = Read_From_Input_File_<double>("deltaP0_", fullfile, 1.0);
 
         
         // Noise

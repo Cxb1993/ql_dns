@@ -3,7 +3,7 @@ function WriteInitialConditions(ICs)
 % Format is an HDF5 file, same as is saved by QL_DNS itself, save data in
 % /t=0 group
 global file
-QLdns_input = 'SW_test';
+QLdns_input = 'CompTest';
 
 fullfolder = ['/Users/jsquire/Documents/QL_DNS/QL_DNS/Data/' QLdns_input];
 if ~exist(fullfolder,'dir')

@@ -1,10 +1,11 @@
-function [fullsol,enuf,kx] = ReadDumpOutput
+function [fullsol,enuf,kx] = ReadDumpOutput(filein,nVs)
 % Reads data from h5 file and puts into a matrix in the same format as my
 % other code mat(ny,nx,nz)
 global file num_Lin num_MF;
-file = '/Users/jsquire/Documents/QL_DNS/QL_DNS/Data/LinByFuR1_Rm0.1Pm1_Lz1S0/FullSolution.h5';
-num_Lin = 4;
-num_MF = 4;
+% file = '/Users/jsquire/Documents/QL_DNS/QL_DNS/Data/CompTest/FullSolution.h5';
+file = filein;
+num_Lin = nVs(1);
+num_MF = nVs(2);
 
 % Get info, work out dimensions and number of time slices
 hinfo = hdf5info(file);

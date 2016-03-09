@@ -12,10 +12,13 @@
 #include "Models/MHD_BQlin.h"
 #include "Models/MHD_FullQlin.h"
 #include "Models/HD_fullU.h"
+#include "Models/CompMHDIso_FixedMF.h"
+#include "Models/CompMHDKinetic_FixedMF.h"
 // Integrators
 #include "Integrators/Euler.h"
 #include "Integrators/EulerCN.h"
 #include "Integrators/RK3CN.h"
+#include "Integrators/RK3CN_Elin.h"
 // Auxiliary
 #include "Auxiliary/MPIdata.h"
 #include "Auxiliary/Input_parameters.h"
@@ -58,6 +61,10 @@ int main(int argc, char ** argv)
         fluidEqs = new MHD_FullQlin(SP, mpi, fft);
     } else if (SP.equations_to_use == "HD_fullU") {
         fluidEqs = new HD_fullU(SP, mpi, fft);
+    } else if (SP.equations_to_use == "CompMHDIso_FixedMF") {
+        fluidEqs = new CompMHDIso_FixedMF(SP, mpi, fft);
+    } else if (SP.equations_to_use == "CompMHDKinetic_FixedMF") {
+        fluidEqs = new CompMHDKinetic_FixedMF(SP, mpi, fft);
     } else if (SP.equations_to_use == "ConstantDamping") {
         fluidEqs = new ConstantDamping(SP, mpi, fft);
     } else {
@@ -72,7 +79,7 @@ int main(int argc, char ** argv)
     solution *sol = new solution( fluidEqs );
     
     // Initial condtions
-    sol->Initial_Conditions(SP,fft,fluidEqs,&mpi);
+    sol->Initial_Conditions(SP,fft,fluidEqs,&mpi );
     
     // Set up dump saving class (HDF5)
     FullSave_Load *sol_save = new FullSave_Load(SP, &mpi, fluidEqs); // NB: have to make this a pointer so it can be deleted before MPI_Finalize
@@ -85,10 +92,10 @@ int main(int argc, char ** argv)
     int step_since_TV = 0, step_since_dump = 0; // Counting steps since timevar/dump
     
     // Integrator
-    Integrator *integrator = new RK3CN(t, SP, fluidEqs);
+    Integrator *integrator = new RK3CN_Elin(t, SP, fluidEqs);
 
     // Set up time variables -- energy, engular momentum etc.
-    TimeVariables *time_vars = new TimeVariables(SP, fluidEqs->num_Lin(), fluidEqs->num_MFs(), fluidEqs->num_reynolds_saves(), mpi.my_n_v());
+    TimeVariables *time_vars = new TimeVariables(SP, 4, fluidEqs->num_MFs(), fluidEqs->num_reynolds_saves(), mpi.my_n_v());
     if (!sol_save->start_from_saved()){
         // Save initial conditions
         fluidEqs->Calc_Energy_AM_Diss(time_vars, t, sol);
