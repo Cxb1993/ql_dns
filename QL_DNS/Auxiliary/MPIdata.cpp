@@ -93,7 +93,6 @@ void MPIdata::SumReduce_doub(double* in_p, double* out_p, int size) {
 }
 void MPIdata::SumAllReduce_doub(double* in_p, double* out_p, int size) {
     // MPI_Reduce wrapper for data of type double - convenient for multiple reasons
-    // Always reduces to processor 0 right now
 #ifdef USE_MPI_FLAG
     MPI_Allreduce(in_p, out_p, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 #else

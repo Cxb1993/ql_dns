@@ -13,7 +13,7 @@
 // NB: No MF stresses, fully linear
 CompMHDIso_FixedMF::CompMHDIso_FixedMF(const Inputs& sp, MPIdata& mpi, fftwPlans& fft) :
 equations_name("CompMHDIso_FixedMF"),
-numMF_(4), numLin_(6),
+numMF_(4), numLin_(7),
 q_(sp.q),Omega_(sp.omega), // Rotation
 B0z_(sp.B0z), // Mean vertical field
 rho0_(sp.rho0), // Mean density
@@ -39,7 +39,7 @@ fft_(fft) // FFT data
     }
     
     // Linear variables are
-    // 0: rho, 1: vx, 2: vy, 3: vz, 4: bx, 5: jx
+    // 0: rho, 1: vx, 2: vy, 3: vz, 4: bx, 5: by, 6: bz
     
     // Setup MPI
     mpi_.Split_NXY_Grid( Dimxy_full() ); // Work out MPI splitting
@@ -152,10 +152,14 @@ fft_(fft) // FFT data
     tmp2_k_ = dcmplxVec( NZ() );
     tmp3_k_ = dcmplxVec( NZ() );
     tmp4_k_ = dcmplxVec( NZ() );
-    //  Size NZ() uy, uz etc.
-    b_y_ = dcmplxVec( NZ() ); // k space versions of flutctuating y and z
+    // b variables, with divergence cleaned
+    if (q_ != 0) {
+        mpi_.print1("Warning divergence constraint may be incorrectly implemented with shear flow!");
+    }
+    b_x_ = dcmplxVec( NZ() );
+    b_y_ = dcmplxVec( NZ() );
     b_z_ = dcmplxVec( NZ() );
-    
+
     
     
     
@@ -215,7 +219,8 @@ void CompMHDIso_FixedMF::rhs(const double t, const double dt_lin,
     
     // Reynolds stresses -- added to at each step in the loop
     reynolds_stress_MPI_send_.setZero();
-    
+    divb_monitor_ = 0.;
+    divb_global_ = 0.;// to sum for mpi
     
     /////////////////////////////////////
     //   ALL OF THIS IS PARALLELIZED
@@ -254,12 +259,15 @@ void CompMHDIso_FixedMF::rhs(const double t, const double dt_lin,
 //        cout << divu_.transpose().abs().sum() << endl;
 
         
+        // Clean divergence from b -- put into b_x_, b_y_ etc.. Not the most efficient, but easy and obvious and meh
+        // Without shear, this is conserved. With shear, only to time integrator precision, presumably because kx changes each time step. This then quickly causes divergence to grow because in the formulation I have here, dt(divb)!=0 if input divb!=0 (would need to also include U divB term, then it wouldn't grow so fast).
+        tmp1_k_ = ilapFtmp_*(kxctmp_*(*SolIn->pLin(i, 4)) + kyctmp_*(*SolIn->pLin(i, 5)) + K->kz*(*SolIn->pLin(i, 6)));
+        b_x_ = (*SolIn->pLin(i, 4)) - kxctmp_*tmp1_k_;
+        b_y_ = (*SolIn->pLin(i, 5)) - kyctmp_*tmp1_k_;
+        b_z_ = (*SolIn->pLin(i, 6)) - K->kz*tmp1_k_;
         
-        // Define by, bz etc.,
-        b_y_ = ( (-kyctmp_*kxctmp_)*(*SolIn->pLin(i, 4)) +  K->kz*(*SolIn->pLin(i, 5)) )*ilap2tmp_;
-        b_z_ = ( -kxctmp_*K->kz*(*SolIn->pLin(i, 4)) -  kyctmp_*(*SolIn->pLin(i, 5)) )*ilap2tmp_;
         // b
-        tmp1_k_ = fft_.fac1D()*(*SolIn->pLin(i, 4)); // bx (only for reynolds stress)
+        tmp1_k_ = fft_.fac1D()*b_x_; // bx (only for reynolds stress)
         fft_.inverse( &tmp1_k_, b_+0);
         tmp1_k_ = fft_.fac1D()*b_y_; // by - (only for reynolds stress)
         fft_.inverse( &tmp1_k_, b_+1);
@@ -274,7 +282,7 @@ void CompMHDIso_FixedMF::rhs(const double t, const double dt_lin,
 
         
         // Linear variables are
-        // 0: rho, 1: vx, 2: vy, 3: vz, 4: bx, 5: jx
+        // 0: rho, 1: vx, 2: vy, 3: vz, 4: bx, 5: by, 6: bz
         
         ///////////////////////////////////
         //  Advance rho
@@ -304,7 +312,7 @@ void CompMHDIso_FixedMF::rhs(const double t, const double dt_lin,
         tmp1_z_ = MBx_*b_[0] + MBy_*b_[1] + B0z_*b_[2];
         fft_.forward(&tmp1_z_, &tmp4_k_);
         // u dot
-        *SolOut->pLin(i, 1) = - tmp1_k_ + 2.0*Omega_*(*SolIn->pLin(i, 2)) + B0z_/rho0_*K->kz*(*SolIn->pLin(i, 4))  - 1/rho0_*kxctmp_*(cs20_*(*SolIn->pLin(i, 0)) + tmp4_k_);
+        *SolOut->pLin(i, 1) = - tmp1_k_ + 2.0*Omega_*(*SolIn->pLin(i, 2)) + B0z_/rho0_*K->kz*b_x_  - 1/rho0_*kxctmp_*(cs20_*(*SolIn->pLin(i, 0)) + tmp4_k_);
         *SolOut->pLin(i, 2) = -tmp2_k_ + (q_-2.0*Omega_)*(*SolIn->pLin(i, 1)) + B0z_/rho0_*K->kz*b_y_ - 1/rho0_*kyctmp_*(cs20_*(*SolIn->pLin(i, 0)) + tmp4_k_);
         *SolOut->pLin(i, 3) = -tmp3_k_  + B0z_/rho0_*K->kz*b_z_ - 1/rho0_*K->kz*(cs20_*(*SolIn->pLin(i, 0)) + tmp4_k_);
         
@@ -332,23 +340,29 @@ void CompMHDIso_FixedMF::rhs(const double t, const double dt_lin,
         // Ux dx(bz) + Uy dy(bz) - B.GU + B*div(u)
         tmp1_z_ = MUx_*b_[5] + MUy_*b_[8] - (MBx_*u_[5] + MBy_*u_[8])  +  B0z_*divu_;
         fft_.forward(&tmp1_z_, &tmp3_k_);
-        // b and eta dot
-        // b
+        // bx, by, bz dot
+        // bx
         *SolOut->pLin(i, 4) = B0z_*K->kz*(*SolIn->pLin(i, 1)) - tmp1_k_;
-        // eta
-        *SolOut->pLin(i, 5) = -q_*K->kz*(*SolIn->pLin(i, 4))  + B0z_*K->kz*(K->kz*(*SolIn->pLin(i, 2)) - kyctmp_*(*SolIn->pLin(i, 3)))  -   (K->kz*tmp2_k_ - kyctmp_*tmp3_k_);
-        
-        
-        
-        
+        // by
+        *SolOut->pLin(i, 5) = -q_*b_x_  +   B0z_*K->kz*(*SolIn->pLin(i, 2))  -   tmp2_k_;
+        // bz
+        *SolOut->pLin(i, 6) =  B0z_*K->kz*(*SolIn->pLin(i, 3))  -   tmp3_k_;
 
+
+        // Monitor div(b) to make sure it doens't grow too large overall
+        divb_monitor_ += (kxctmp_*(*SolIn->pLin(i, 4))+kyctmp_*(*SolIn->pLin(i, 5))+K->kz*(*SolIn->pLin(i, 6))).abs().sum();
+        
+//        cout << "kx, ky:" << kxtmp_ <<" " << kytmp_ << ":\n";
+//        cout << (kxctmp_*(*SolIn->pLin(i, 4))+kyctmp_*(*SolIn->pLin(i, 5))+K->kz*(*SolIn->pLin(i, 6))).transpose() << endl;
+//        cout << (kxctmp_*b_x_+kyctmp_*b_y_+K->kz*b_z_).transpose() << endl;
+//        cout << (kxctmp_*(*SolOut->pLin(i, 4))+kyctmp_*(*SolOut->pLin(i, 5))+K->kz*(*SolOut->pLin(i, 6))).transpose() << endl;
         
        
         
         ////////////////////////////////////////
         //////   LINEAR PART
         // Need to re-evaluate laplacian, since different time.
-        kxtmp_=kxtmp_ + q_*dt_lin*kytmp_;
+        kxtmp_=kxtmp_ + q_*dt_lin/2*kytmp_;
         // Use lapFtmp_ to store Laplacian^Viscosity_order/2
         lapFtmp_= -((-kxtmp_*kxtmp_-kytmp_*kytmp_)+ K->kz2).abs().pow(viscosity_order_/2);
         linOpFluct[i][0] = kappa_*lapFtmp_;
@@ -357,6 +371,7 @@ void CompMHDIso_FixedMF::rhs(const double t, const double dt_lin,
         linOpFluct[i][3] = linOpFluct[i][1];
         linOpFluct[i][4]  = eta_*lapFtmp_;
         linOpFluct[i][5] = linOpFluct[i][4];
+        linOpFluct[i][6] = linOpFluct[i][4];
         
         ////////////////////////////////////////
         
@@ -365,7 +380,13 @@ void CompMHDIso_FixedMF::rhs(const double t, const double dt_lin,
         
         
     }
-
+    
+    mpi_.SumAllReduce_doub(&divb_monitor_,&divb_global_,1);
+    if (divb_global_>1e-10){
+        stringstream prnt;
+        prnt << "div(b) has grown to " << divb_global_ << " at t="<< t <<". Be worried!\n";
+        mpi_.print1(prnt.str());
+    }
     
     // No Reynolds stress
     //////////////////////////////////////
@@ -399,6 +420,8 @@ void CompMHDIso_FixedMF::linearOPs_Init(double t0, doubVec **linOpFluct, doubVec
         linOpFluct[i][3] = linOpFluct[i][1];
         linOpFluct[i][4]  = eta_*lapFtmp_;
         linOpFluct[i][5] = linOpFluct[i][4];
+        linOpFluct[i][6] = linOpFluct[i][4];
+
     }
     // Mean fields
     if (QL_YN_) {
@@ -472,36 +495,27 @@ void CompMHDIso_FixedMF::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const 
     //   ALL OF THIS IS PARALLELIZED
     for (int i=0; i<Dimxy();  ++i){
         // Form Laplacians using time-dependent kx
-        assign_laplacians_(i, t, 1);
+        assign_laplacians_(i, t, 0);
         
         mult_fac = 2;
         if (kytmp_== 0.0 )
             mult_fac = 1; // Only count ky=0 mode once
-        
-        lap2tmp_ = lapFtmp_*ilap2tmp_; // lap2tmp_ just a convenient storage
         
         
         if (tv->energy_save_Q()){
             //////////////////////////////////////
             //     ENERGY
             
-            // (NB: ilap2tmp_ is negative but want abs, just use -ilap2)
             energy_u += mult_fac*rho0_*( (*(sol->pLin(i,1))).abs2() + (*(sol->pLin(i,2))).abs2() + (*(sol->pLin(i,3))).abs2() ).sum();
-            energy_b += mult_fac*(  lap2tmp_*( *(sol->pLin(i,4)) ).abs2() - ilap2tmp_*( *(sol->pLin(i,5)) ).abs2()  ).sum();
+            energy_b += mult_fac*( (*(sol->pLin(i,4))).abs2() + (*(sol->pLin(i,5))).abs2() + (*(sol->pLin(i,6))).abs2() ).sum();
             //////////////////////////////////////
-//            cout << "kx,ky = " << kxtmp_ << "," << kytmp_ <<": " << ( (*(sol->pLin(i,1))).abs2() + (*(sol->pLin(i,2))).abs2() + (*(sol->pLin(i,3))).abs2() ).transpose() << endl;
-            
-            //            std::cout << "kx = " << kxtmp_ << ", ky = " << kytmp_ << ": " <<mult_fac*(  lap2tmp_*( *(sol->pLin(i,0)) ).abs2() - ilap2tmp_*( *(sol->pLin(i,1)) ).abs2()  ).sum() <<std::endl;
         }
         if (tv->AngMom_save_Q()){
             //////////////////////////////////////
             //   Angular momentum
             
-            
-            b_y_ = ( (-kyctmp_*kxctmp_)*(*sol->pLin(i, 4)) +  K->kz*(*sol->pLin(i, 5)) )*ilap2tmp_;  //   Actually by
-            
             AM_u += mult_fac*( (*(sol->pLin(i,1)))*(*(sol->pLin(i,2))).conjugate() ).real().sum();
-            AM_b += mult_fac*( (*sol->pLin(i, 4))*b_y_.conjugate() ).real().sum();
+            AM_b += mult_fac*( (*sol->pLin(i, 4))*(*sol->pLin(i, 5)).conjugate() ).real().sum();
             //
             //////////////////////////////////////
         }
@@ -510,7 +524,7 @@ void CompMHDIso_FixedMF::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const 
             //     DISSIPATION
             // (NB: ilap2tmp_ and lapFtmp_ are negative but want abs, just use negative)
             diss_u += (mult_fac*nu_)*(  -lapFtmp_*( (*(sol->pLin(i,1))).abs2() + (*(sol->pLin(i,2))).abs2() + (*(sol->pLin(i,3))).abs2()  ) ).sum();
-            diss_b += (mult_fac*eta_)*(  -lapFtmp_*( lap2tmp_*( *(sol->pLin(i,4)) ).abs2() - ilap2tmp_*( *(sol->pLin(i,5)) ).abs2() ) ).sum();
+            diss_b += (mult_fac*eta_)*(  -lapFtmp_*( (*(sol->pLin(i,4))).abs2() + (*(sol->pLin(i,5))).abs2() + (*(sol->pLin(i,6))).abs2() ) ).sum();
             //
             //////////////////////////////////////
         }
@@ -533,15 +547,12 @@ void CompMHDIso_FixedMF::Calc_Energy_AM_Diss(TimeVariables* tv, double t, const 
             tmp1_k_ = fft_.fac1D()*(kxctmp_*(*sol->pLin(i, 1)) + kyctmp_*(*sol->pLin(i, 2)) + K->kz*(*sol->pLin(i, 3)));
             fft_.inverse( &tmp1_k_, &divu_);
             
-            // Define by, bz etc.,
-            b_y_ = ( (-kyctmp_*kxctmp_)*(*sol->pLin(i, 4)) +  K->kz*(*sol->pLin(i, 5)) )*ilap2tmp_;
-            b_z_ = ( -kxctmp_*K->kz*(*sol->pLin(i, 4)) -  kyctmp_*(*sol->pLin(i, 5)) )*ilap2tmp_;
             // b
             tmp1_k_ = fft_.fac1D()*(*sol->pLin(i, 4)); // bx
             fft_.inverse( &tmp1_k_, b_+0);
-            tmp1_k_ = fft_.fac1D()*b_y_; // by
+            tmp1_k_ = fft_.fac1D()*(*sol->pLin(i, 5)); // by
             fft_.inverse( &tmp1_k_, b_+1);
-            tmp1_k_ = fft_.fac1D()*b_z_; // bz
+            tmp1_k_ = fft_.fac1D()*(*sol->pLin(i, 6)); // bz
             fft_.inverse( &tmp1_k_, b_+2);
             
             // Bx
@@ -881,6 +892,8 @@ void CompMHDIso_FixedMF::DrivingNoise(double t, double dt, solution *sol) {
             // U
             tmp1_k_.setZero();
             tmp2_k_.setZero();
+            tmp3_k_.setZero();
+            tmp4_k_.setZero();
             dcmplx* ePoint = tmp1_k_.data();
             for (int jj=0; jj<NZ(); ++jj) {
                 if (drive_cond_pnt[jj] && !drive_only_magnetic_fluctuations_)
@@ -892,27 +905,31 @@ void CompMHDIso_FixedMF::DrivingNoise(double t, double dt, solution *sol) {
                 if (drive_cond_pnt[jj] && !drive_only_magnetic_fluctuations_)
                     ePoint[jj] = multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
             }
-//            cout << tmp2_k_.transpose() << endl;
 
             *(sol->pLin(i,1) ) += tmp1_k_;
             *(sol->pLin(i,2) ) += ( (-kyctmp_*kxctmp_)*tmp1_k_ +  K->kz*tmp2_k_ )*ilap2tmp_;
             *(sol->pLin(i,3) ) += ( -kxctmp_*K->kz*tmp1_k_ -  kyctmp_*tmp2_k_ )*ilap2tmp_;
             
+            // Same for the magnetic field
             // b
-            ePoint = (*(sol->pLin(i,4) )).data();
+            ePoint = tmp3_k_.data();
             for (int jj=0; jj<NZ(); ++jj) {
                 if (drive_cond_pnt[jj] && !drive_only_velocity_fluctuations_)
                     ePoint[jj] += multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
             }
             // eta
-            ePoint = (*(sol->pLin(i,5) )).data();
+            ePoint = tmp4_k_.data();
             for (int jj=0; jj<NZ(); ++jj) {
                 if (drive_cond_pnt[jj] && !drive_only_velocity_fluctuations_)
                     ePoint[jj] += multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
             }
+            *(sol->pLin(i,4) ) += tmp3_k_;
+            *(sol->pLin(i,5) ) += ( (-kyctmp_*kxctmp_)*tmp3_k_ +  K->kz*tmp4_k_ )*ilap2tmp_;
+            *(sol->pLin(i,6) ) += ( -kxctmp_*K->kz*tmp3_k_ -  kyctmp_*tmp4_k_ )*ilap2tmp_;
         }
         
         // Don't drive kx=ky=0 modes (mean fields) or ky=kz=0 modes (non-invertible).These are both taken care of in laplacian
+        // MODIFIED -- NOW WILL DRIVE ky=kz=0 MODES
         // Still need to make sure that ky=0 kx!=0 kz!=0 modes are symmetric. In particular ky=0, kx=a, kz=b must be the complex conjugate to kx=-a, kz=-b
         // To do this, have to communicate between processors!
         
@@ -960,6 +977,8 @@ void CompMHDIso_FixedMF::DrivingNoise(double t, double dt, solution *sol) {
             // Use tmp1_k_ etc. to store noise so that divergence constraint can be enforced on the noise. I.e., tmp1_k and tmp2_k act just like u and zeta until right at the end, after all of the message passing
             tmp1_k_.setZero();
             tmp2_k_.setZero();
+            tmp3_k_.setZero();
+            tmp4_k_.setZero();
             dcmplx* noise_buff_dat_ = noise_buff_.data();
             dcmplx* ePoint = tmp1_k_.data();
             for (int jj=1; jj<NZ(); ++jj){
@@ -982,9 +1001,10 @@ void CompMHDIso_FixedMF::DrivingNoise(double t, double dt, solution *sol) {
             *(sol->pLin(i,2) ) += ( (-kyctmp_*kxctmp_)*tmp1_k_ +  K->kz*tmp2_k_ )*ilap2tmp_;
             *(sol->pLin(i,3) ) += ( -kxctmp_*K->kz*tmp1_k_ -  kyctmp_*tmp2_k_ )*ilap2tmp_;
             
+            
             // b
             noise_buff_dat_ += noise_buff_len_;
-            ePoint = (*(sol->pLin(i,4) )).data();
+            ePoint = tmp3_k_.data();
             for (int jj=1; jj<NZ(); ++jj){
                 if (drive_cond_pnt[jj] && !drive_only_velocity_fluctuations_){
                     noise_buff_dat_[jj-1]=multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
@@ -993,13 +1013,17 @@ void CompMHDIso_FixedMF::DrivingNoise(double t, double dt, solution *sol) {
             }
             // eta
             noise_buff_dat_ += noise_buff_len_;
-            ePoint = (*(sol->pLin(i,5) )).data();
+            ePoint = tmp4_k_.data();
             for (int jj=1; jj<NZ(); ++jj){
                 if (drive_cond_pnt[jj] && !drive_only_velocity_fluctuations_){
                     noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
                     ePoint[jj] += noise_buff_dat_[jj-1];
                 }
             }
+            // Assign b and eta noise to bx, by, bz
+            *(sol->pLin(i,4) ) += tmp3_k_;
+            *(sol->pLin(i,5) ) += ( (-kyctmp_*kxctmp_)*tmp3_k_ +  K->kz*tmp4_k_ )*ilap2tmp_;
+            *(sol->pLin(i,6) ) += ( -kxctmp_*K->kz*tmp3_k_ -  kyctmp_*tmp4_k_ )*ilap2tmp_;
             
             // Send data
             mpi_.Send_dcmplx(noise_buff_.data(), num_noise_vars_*noise_buff_len_, *(K->i_sp), *(K->i_tosend));
@@ -1014,6 +1038,9 @@ void CompMHDIso_FixedMF::DrivingNoise(double t, double dt, solution *sol) {
         // Recieving
         while (K->i_fp < K->match_kx_from_p.end()) {
             int i = *(K->i_loc);
+            // Assign k's again, since need for conversion to ux etc.
+            assign_laplacians_(i,t,1);
+            
             // Receive data from matching call
             mpi_.Recv_dcmplx(noise_buff_.data(), num_noise_vars_*noise_buff_len_, *(K->i_fp), *(K->i_from));
             
@@ -1025,20 +1052,26 @@ void CompMHDIso_FixedMF::DrivingNoise(double t, double dt, solution *sol) {
 
             tmp1_k_.setZero();
             tmp2_k_.setZero();
+            tmp3_k_.setZero();
+            tmp4_k_.setZero();
             { // Loop through each variable
                 int nV=0;
                 tmp1_k_.segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
                 ++nV;
                 tmp2_k_.segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
                 ++nV;
-                (*(sol->pLin(i,4) )).segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
+                tmp3_k_.segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
                 ++nV;
-                (*(sol->pLin(i,5) )).segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
+                tmp4_k_.segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
             }
             // Assign u and zeta noise to ux, uy, uz
             *(sol->pLin(i,1) ) += tmp1_k_;
             *(sol->pLin(i,2) ) += ( (-kyctmp_*kxctmp_)*tmp1_k_ +  K->kz*tmp2_k_ )*ilap2tmp_;
             *(sol->pLin(i,3) ) += ( -kxctmp_*K->kz*tmp1_k_ -  kyctmp_*tmp2_k_ )*ilap2tmp_;
+            // Assign b and eta noise to bx, by, bz
+            *(sol->pLin(i,4) ) += tmp3_k_;
+            *(sol->pLin(i,5) ) += ( (-kyctmp_*kxctmp_)*tmp3_k_ +  K->kz*tmp4_k_ )*ilap2tmp_;
+            *(sol->pLin(i,6) ) += ( -kxctmp_*K->kz*tmp3_k_ -  kyctmp_*tmp4_k_ )*ilap2tmp_;
             
             // Update iterators
             ++(K->i_fp);
@@ -1076,6 +1109,8 @@ void CompMHDIso_FixedMF::DrivingNoise(double t, double dt, solution *sol) {
             // Make some noise - add to current k value
             tmp1_k_.setZero();
             tmp2_k_.setZero();
+            tmp3_k_.setZero();
+            tmp4_k_.setZero();
             dcmplx* noise_buff_dat_ = noise_buff_.data();
             dcmplx* ePoint = tmp1_k_.data();
             for (int jj=1; jj<NZ(); ++jj){
@@ -1098,9 +1133,10 @@ void CompMHDIso_FixedMF::DrivingNoise(double t, double dt, solution *sol) {
             *(sol->pLin(i,2) ) += ( (-kyctmp_*kxctmp_)*tmp1_k_ +  K->kz*tmp2_k_ )*ilap2tmp_;
             *(sol->pLin(i,3) ) += ( -kxctmp_*K->kz*tmp1_k_ -  kyctmp_*tmp2_k_ )*ilap2tmp_;
             
+            
             // b
             noise_buff_dat_ += noise_buff_len_;
-            ePoint = (*(sol->pLin(i,4) )).data();
+            ePoint = tmp3_k_.data();
             for (int jj=1; jj<NZ(); ++jj){
                 if (drive_cond_pnt[jj] && !drive_only_velocity_fluctuations_){
                     noise_buff_dat_[jj-1]=multU_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
@@ -1109,17 +1145,24 @@ void CompMHDIso_FixedMF::DrivingNoise(double t, double dt, solution *sol) {
             }
             // eta
             noise_buff_dat_ += noise_buff_len_;
-            ePoint = (*(sol->pLin(i,5) )).data();
+            ePoint = tmp4_k_.data();
             for (int jj=1; jj<NZ(); ++jj){
                 if (drive_cond_pnt[jj] && !drive_only_velocity_fluctuations_){
                     noise_buff_dat_[jj-1]=multZeta_pnt[jj]*dcmplx(ndist_(mt_), ndist_(mt_));
                     ePoint[jj] += noise_buff_dat_[jj-1];
                 }
             }
+            // Assign b and eta noise to bx, by, bz
+            *(sol->pLin(i,4) ) += tmp3_k_;
+            *(sol->pLin(i,5) ) += ( (-kyctmp_*kxctmp_)*tmp3_k_ +  K->kz*tmp4_k_ )*ilap2tmp_;
+            *(sol->pLin(i,6) ) += ( -kxctmp_*K->kz*tmp3_k_ -  kyctmp_*tmp4_k_ )*ilap2tmp_;
             
-            
+            ////////////////////////////////////////////
             // Find matching K value and use the same noise
             i = *(K->i_loc);
+            
+            // Assign k's again, since need for conversion to ux etc.
+            assign_laplacians_(i,t,1);
             
             // Flip noise around
             for (int nV=0; nV<num_noise_vars_; ++nV) {
@@ -1129,20 +1172,26 @@ void CompMHDIso_FixedMF::DrivingNoise(double t, double dt, solution *sol) {
             
             tmp1_k_.setZero();
             tmp2_k_.setZero();
+            tmp3_k_.setZero();
+            tmp4_k_.setZero();
             { // Loop through each variable
                 int nV=0;
                 tmp1_k_.segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
                 ++nV;
                 tmp2_k_.segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
                 ++nV;
-                (*(sol->pLin(i,4) )).segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
+                tmp3_k_.segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
                 ++nV;
-                (*(sol->pLin(i,5) )).segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
+                tmp4_k_.segment(1,NZ()-1) += noise_buff_.segment(nV*noise_buff_len_, noise_buff_len_).conjugate();
             }
             // Assign u and zeta noise to ux, uy, uz
             *(sol->pLin(i,1) ) += tmp1_k_;
             *(sol->pLin(i,2) ) += ( (-kyctmp_*kxctmp_)*tmp1_k_ +  K->kz*tmp2_k_ )*ilap2tmp_;
             *(sol->pLin(i,3) ) += ( -kxctmp_*K->kz*tmp1_k_ -  kyctmp_*tmp2_k_ )*ilap2tmp_;
+            // Assign b and eta noise to bx, by, bz
+            *(sol->pLin(i,4) ) += tmp3_k_;
+            *(sol->pLin(i,5) ) += ( (-kyctmp_*kxctmp_)*tmp3_k_ +  K->kz*tmp4_k_ )*ilap2tmp_;
+            *(sol->pLin(i,6) ) += ( -kxctmp_*K->kz*tmp3_k_ -  kyctmp_*tmp4_k_ )*ilap2tmp_;
             
             
             // Update iterators

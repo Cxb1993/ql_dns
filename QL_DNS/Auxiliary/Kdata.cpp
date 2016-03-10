@@ -60,7 +60,12 @@ Kdata::Kdata(Model *mod, MPIdata *mpi){
     }
 
 
-    
+//    for (int i=0; i<nxy ;  ++i){
+//        stringstream prnt;
+//        prnt << "kx, ky: " <<kx_index[i] << ", " << ky_index[i] <<endl;
+//        mpi->printAll(prnt.str());
+//    }
+//    
     ///////////////////////////////////////////
     // kz and kz^2 arrays
     // kz is length NZ eigen array

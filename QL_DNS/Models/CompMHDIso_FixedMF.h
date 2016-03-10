@@ -81,6 +81,7 @@ private:
     const double P0_;
     // Sound speed squared
     const double cs20_;
+    const double Omega_; // Rotation level, 0 for pure shear, 2/3*q for Keplerian
     
     bool QL_YN_; // Flag for QL or not
     
@@ -91,8 +92,7 @@ private:
     bool turn_off_fluct_Lorentz_force_;
     int L_mult_;
     int num_reynolds_saves_;
-    
-    const double Omega_; // Rotation level, 0 for pure shear, 2/3*q for Keplerian
+
     
     // fft
     fftwPlans &fft_;
@@ -135,13 +135,15 @@ private:
     // u and b and derivatives - Real space
     dcmplxVec *u_, *b_; // (uy,uz,dx{ux,uy,uz},dy{ux,uy,uz}) (and b)
     dcmplxVec rho_, divu_;
-    dcmplxVec b_y_, b_z_; // In Fourier space
     dcmplxVec tmp1_k_,tmp2_k_,tmp3_k_,tmp4_k_; // Temps before transform (size NZ() )
     dcmplxVec tmp1_z_;
+    dcmplxVec b_x_,b_y_,b_z_; // bx, by and bz, needed to clean divergence
     
     dcmplx kxctmp_, kyctmp_;
     double kxtmp_,kytmp_;
     int ind_ky_;
+    
+    double divb_monitor_, divb_global_; // Monitor div(b)
     
     dcmplxVec MBy_,dzMBy_,MBx_,dzMBx_; // Mean fields (real space)
     dcmplxVec MUy_,dzMUy_,MUx_,dzMUx_; // Mean fields (real space)
