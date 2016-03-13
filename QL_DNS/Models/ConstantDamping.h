@@ -27,7 +27,7 @@ public:
     
     // Equations
     void rhs(const double t, const double dt_lin,
-             const solution * SolIn, solution * SolOut, doubVec **linOpFluct);
+              solution * SolIn, solution * SolOut, doubVec **linOpFluct);
     
     // Linear operator initialization
     void linearOPs_Init(double t0, doubVec **linOpFluct, doubVec *linOpMF);

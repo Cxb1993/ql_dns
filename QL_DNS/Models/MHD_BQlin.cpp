@@ -113,8 +113,9 @@ MHD_BQlin::~MHD_BQlin(){
     delete K;
 }
 
+// Modified const of SolIn so that it can be divergence cleaned!
 void MHD_BQlin::rhs(const double t, const double dt_lin,
-                          const solution * SolIn, solution * SolOut,doubVec **linOpFluct) {
+                           solution * SolIn, solution * SolOut,doubVec **linOpFluct) {
     // Calculate mean fields in real space
     // Calculate MFs in real space     By_ = MFin[1].matrix()*fft1Dfac_; // fft back doesn't include normalization
     // (NB could be optimized slightly by including memory copy in multiplication)

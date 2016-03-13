@@ -26,6 +26,7 @@ dont_drive_ky0_modes_(0),// If true, no driving ky=0 modes
 drive_only_velocity_fluctuations_(sp.drive_only_velocityQ), // If true, no magnetic forcing
 drive_only_magnetic_fluctuations_(sp.drive_only_magneticQ), // If true, no velocity forcing
 save_full_reynolds_(0),// Saves all the nonlinear stresses if true
+apply_b_divergence_cleaning_(1), // Whether to clean div(b)
 Model(sp.NZ, sp.NXY , sp.L), // Dimensions - stored in base
 mpi_(mpi), // MPI data
 fft_(fft) // FFT data
@@ -108,7 +109,7 @@ fft_(fft) // FFT data
     
     // Random settings, print to avoid mistakes
     std::stringstream prnt;
-    prnt << "Rotation set to " << Omega_ <<"\n";
+    prnt << "Omega = " << Omega_ << ", shear = " << q_ << "\n";
     mpi_.print1(prnt.str());
     if (dont_drive_ky0_modes_)
         mpi_.print1("ky=0 modes are excluded from this calculation!\n");
@@ -116,10 +117,13 @@ fft_(fft) // FFT data
         mpi_.print1("No Magnetic driving noise!\n");
     if (drive_only_magnetic_fluctuations_)
         mpi_.print1("No velocity driving noise!\n");
+    if (!apply_b_divergence_cleaning_)
+        mpi_.print1("No magnetic field divergence cleaning!\n");
     // Viscosity at kmax, useful for hyperviscosities
     prnt.str("");
-    prnt << "nu*k^n ~ 1 at k = " << pow(1./nu_,1.0/viscosity_order_) << " (" << pow(1./nu_,1./viscosity_order_)/kmax << "*kmax): nu*kmax^n = " << nu_*pow(kmax,viscosity_order_) << std::endl;
+    prnt << "nu*k^n ~ 1 at k = " << pow(1./nu_,1.0/viscosity_order_) << " (" << pow(1./nu_,1./viscosity_order_)/kmax << "*kmax): nu*kmax^n = " << nu_*pow(kmax,viscosity_order_) << std::endl << std::endl;
     mpi_.print1(prnt.str());
+    
     
     
     ////////////////////////////////////////////////////
@@ -152,13 +156,7 @@ fft_(fft) // FFT data
     tmp2_k_ = dcmplxVec( NZ() );
     tmp3_k_ = dcmplxVec( NZ() );
     tmp4_k_ = dcmplxVec( NZ() );
-    // b variables, with divergence cleaned
-    if (q_ != 0) {
-        mpi_.print1("Warning divergence constraint may be incorrectly implemented with shear flow!");
-    }
-    b_x_ = dcmplxVec( NZ() );
-    b_y_ = dcmplxVec( NZ() );
-    b_z_ = dcmplxVec( NZ() );
+    
 
     
     
@@ -183,8 +181,10 @@ CompMHDIso_FixedMF::~CompMHDIso_FixedMF(){
     delete[] b_;
 }
 
+// Modified const of SolIn so that it can be divergence cleaned!
+
 void CompMHDIso_FixedMF::rhs(const double t, const double dt_lin,
-                       const solution * SolIn, solution * SolOut,doubVec **linOpFluct) {
+                        solution * SolIn, solution * SolOut,doubVec **linOpFluct) {
     // Calculate mean fields in real space
     // Calculate MFs in real space     By_ = MFin[1].matrix()*fft1Dfac_; // fft back doesn't include normalization
     // (NB could be optimized slightly by including memory copy in multiplication)
@@ -237,6 +237,7 @@ void CompMHDIso_FixedMF::rhs(const double t, const double dt_lin,
         // Linear variables are
         // 0: rho, 1: vx, 2: vy, 3: vz, 4: bx, 5: jx
         
+        
         // Define uy, uz etc.
         
         // Define derivatives and take ffts -- whole bunch of these are a bit pointless, since don't need to take fft to take x or y deriv... should change later!
@@ -259,19 +260,25 @@ void CompMHDIso_FixedMF::rhs(const double t, const double dt_lin,
 //        cout << divu_.transpose().abs().sum() << endl;
 
         
-        // Clean divergence from b -- put into b_x_, b_y_ etc.. Not the most efficient, but easy and obvious and meh
+        // Clean divergence from b -- put into (*SolIn->pLin(i, 4)), (*SolIn->pLin(i, 5)) etc.. Not the most efficient, but easy and obvious and meh
         // Without shear, this is conserved. With shear, only to time integrator precision, presumably because kx changes each time step. This then quickly causes divergence to grow because in the formulation I have here, dt(divb)!=0 if input divb!=0 (would need to also include U divB term, then it wouldn't grow so fast).
-        tmp1_k_ = ilapFtmp_*(kxctmp_*(*SolIn->pLin(i, 4)) + kyctmp_*(*SolIn->pLin(i, 5)) + K->kz*(*SolIn->pLin(i, 6)));
-        b_x_ = (*SolIn->pLin(i, 4)) - kxctmp_*tmp1_k_;
-        b_y_ = (*SolIn->pLin(i, 5)) - kyctmp_*tmp1_k_;
-        b_z_ = (*SolIn->pLin(i, 6)) - K->kz*tmp1_k_;
+        if (apply_b_divergence_cleaning_) {
+            tmp1_k_ = ilapFtmp_*(kxctmp_*(*SolIn->pLin(i, 4)) + kyctmp_*(*SolIn->pLin(i, 5)) + K->kz*(*SolIn->pLin(i, 6)));
+            (*SolIn->pLin(i, 4)) -= kxctmp_*tmp1_k_;
+            (*SolIn->pLin(i, 5)) -= kyctmp_*tmp1_k_;
+            (*SolIn->pLin(i, 6)) -= K->kz*tmp1_k_;
+        }
+        // Monitor div(b) to make sure it doens't grow too large overall
+        divb_monitor_ += (kxctmp_*(*SolIn->pLin(i, 4))+kyctmp_*(*SolIn->pLin(i, 5))+K->kz*(*SolIn->pLin(i, 6))).abs().sum()/  max(1e-6,sqrt(SolIn->pLin(i, 4)->abs2().sum()+SolIn->pLin(i, 5)->abs2().sum()+SolIn->pLin(i, 6)->abs2().sum()));
+
+        
         
         // b
-        tmp1_k_ = fft_.fac1D()*b_x_; // bx (only for reynolds stress)
+        tmp1_k_ = fft_.fac1D()*(*SolIn->pLin(i, 4)); // bx (only for reynolds stress)
         fft_.inverse( &tmp1_k_, b_+0);
-        tmp1_k_ = fft_.fac1D()*b_y_; // by - (only for reynolds stress)
+        tmp1_k_ = fft_.fac1D()*(*SolIn->pLin(i, 5)); // by - (only for reynolds stress)
         fft_.inverse( &tmp1_k_, b_+1);
-        tmp1_k_ = fft_.fac1D()*b_z_; // bz
+        tmp1_k_ = fft_.fac1D()*(*SolIn->pLin(i, 6)); // bz
         fft_.inverse( &tmp1_k_, b_+2);
         b_[3] = kxctmp_*b_[0];
         b_[4] = kxctmp_*b_[1];
@@ -312,9 +319,9 @@ void CompMHDIso_FixedMF::rhs(const double t, const double dt_lin,
         tmp1_z_ = MBx_*b_[0] + MBy_*b_[1] + B0z_*b_[2];
         fft_.forward(&tmp1_z_, &tmp4_k_);
         // u dot
-        *SolOut->pLin(i, 1) = - tmp1_k_ + 2.0*Omega_*(*SolIn->pLin(i, 2)) + B0z_/rho0_*K->kz*b_x_  - 1/rho0_*kxctmp_*(cs20_*(*SolIn->pLin(i, 0)) + tmp4_k_);
-        *SolOut->pLin(i, 2) = -tmp2_k_ + (q_-2.0*Omega_)*(*SolIn->pLin(i, 1)) + B0z_/rho0_*K->kz*b_y_ - 1/rho0_*kyctmp_*(cs20_*(*SolIn->pLin(i, 0)) + tmp4_k_);
-        *SolOut->pLin(i, 3) = -tmp3_k_  + B0z_/rho0_*K->kz*b_z_ - 1/rho0_*K->kz*(cs20_*(*SolIn->pLin(i, 0)) + tmp4_k_);
+        *SolOut->pLin(i, 1) = - tmp1_k_ + 2.0*Omega_*(*SolIn->pLin(i, 2)) + B0z_/rho0_*K->kz*(*SolIn->pLin(i, 4))  - 1/rho0_*kxctmp_*(cs20_*(*SolIn->pLin(i, 0)) + tmp4_k_);
+        *SolOut->pLin(i, 2) = -tmp2_k_ + (q_-2.0*Omega_)*(*SolIn->pLin(i, 1)) + B0z_/rho0_*K->kz*(*SolIn->pLin(i, 5)) - 1/rho0_*kyctmp_*(cs20_*(*SolIn->pLin(i, 0)) + tmp4_k_);
+        *SolOut->pLin(i, 3) = -tmp3_k_  + B0z_/rho0_*K->kz*(*SolIn->pLin(i, 6)) - 1/rho0_*K->kz*(cs20_*(*SolIn->pLin(i, 0)) + tmp4_k_);
         
 //        cout << (rho0_*K->kz*(cs20_*(*SolIn->pLin(i, 0)))).transpose() << endl;
 
@@ -344,18 +351,16 @@ void CompMHDIso_FixedMF::rhs(const double t, const double dt_lin,
         // bx
         *SolOut->pLin(i, 4) = B0z_*K->kz*(*SolIn->pLin(i, 1)) - tmp1_k_;
         // by
-        *SolOut->pLin(i, 5) = -q_*b_x_  +   B0z_*K->kz*(*SolIn->pLin(i, 2))  -   tmp2_k_;
+        *SolOut->pLin(i, 5) = -q_*(*SolIn->pLin(i, 4))  +   B0z_*K->kz*(*SolIn->pLin(i, 2))  -   tmp2_k_;
         // bz
-        *SolOut->pLin(i, 6) =  B0z_*K->kz*(*SolIn->pLin(i, 3))  -   tmp3_k_;
+        *SolOut->pLin(i, 6) =  B0z_*K->kz*(*SolIn->pLin(i, 3))  -  tmp3_k_;
 
 
-        // Monitor div(b) to make sure it doens't grow too large overall
-        divb_monitor_ += (kxctmp_*(*SolIn->pLin(i, 4))+kyctmp_*(*SolIn->pLin(i, 5))+K->kz*(*SolIn->pLin(i, 6))).abs().sum();
-        
 //        cout << "kx, ky:" << kxtmp_ <<" " << kytmp_ << ":\n";
+//        cout << divu_.transpose() << endl;
 //        cout << (kxctmp_*(*SolIn->pLin(i, 4))+kyctmp_*(*SolIn->pLin(i, 5))+K->kz*(*SolIn->pLin(i, 6))).transpose() << endl;
-//        cout << (kxctmp_*b_x_+kyctmp_*b_y_+K->kz*b_z_).transpose() << endl;
-//        cout << (kxctmp_*(*SolOut->pLin(i, 4))+kyctmp_*(*SolOut->pLin(i, 5))+K->kz*(*SolOut->pLin(i, 6))).transpose() << endl;
+//        cout << (kxctmp_*(*SolOut->pLin(i, 4))+kyctmp_*(*SolOut->pLin(i, 5))+K->kz*(*SolOut->pLin(i, 6))).transpose() << endl <<endl;
+
         
        
         
@@ -382,9 +387,9 @@ void CompMHDIso_FixedMF::rhs(const double t, const double dt_lin,
     }
     
     mpi_.SumAllReduce_doub(&divb_monitor_,&divb_global_,1);
-    if (divb_global_>1e-10){
+    if (divb_global_>1e-9){
         stringstream prnt;
-        prnt << "div(b) has grown to " << divb_global_ << " at t="<< t <<". Be worried!\n";
+        prnt << "div(b)/b has grown to " << divb_global_ << " at t="<< t <<". Be worried!\n";
         mpi_.print1(prnt.str());
     }
     

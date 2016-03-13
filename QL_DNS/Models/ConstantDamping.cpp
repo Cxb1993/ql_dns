@@ -69,8 +69,9 @@ ConstantDamping::~ConstantDamping(){
     delete K;
 }
 
+// Modified const of SolIn so that it can be divergence cleaned!
 void ConstantDamping::rhs(const double t, const double dt_lin,
-               const solution * SolIn, solution * SolOut,doubVec **linOpFluct) {
+                solution * SolIn, solution * SolOut,doubVec **linOpFluct) {
     
     for (int i=0; i<Dimxy(); ++i) {
         // Full Loop containing all the main work equation

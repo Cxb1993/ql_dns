@@ -86,13 +86,20 @@ for kk = to_get
     lapF=kxf.^2+kyf.^2+kzf.^2;
     lap2(kyf==0 & kzf==0)=1;
     mfac(kyf==0)=1;
-    enu{kk}= lapF./lap2.*abs(fullsol{kk}.data(:,:,dealiasinds,1)).^2+1./lap2.*abs(fullsol{kk}.data(:,:,dealiasinds,2)).^2;
-    enu{kk} = mfac.*enu{kk}/(2*(nx+1)^2*(2*ny)^2*nz_full^2);
+    if num_Lin ==4
+        enu{kk}= lapF./lap2.*abs(fullsol{kk}.data(:,:,dealiasinds,1)).^2+1./lap2.*abs(fullsol{kk}.data(:,:,dealiasinds,2)).^2;
+        enu{kk} = mfac.*enu{kk}/(2*(nx+1)^2*(2*ny)^2*nz_full^2);
+    else
+        enu{kk}= abs(fullsol{kk}.data(:,:,dealiasinds,2)).^2  + abs(fullsol{kk}.data(:,:,dealiasinds,3)).^2 + ...
+            abs(fullsol{kk}.data(:,:,dealiasinds,4)).^2  + abs(fullsol{kk}.data(:,:,dealiasinds,5)).^2 + ...
+            abs(fullsol{kk}.data(:,:,dealiasinds,6)).^2  + abs(fullsol{kk}.data(:,:,dealiasinds,7)).^2;
+        enu{kk} = mfac.*enu{kk}/(2*(nx+1)^2*(2*ny)^2*nz_full^2);
+    end
 end
 
 enuf=0;
 for kk=to_get
-    enuf = enuf+enu{kk};
+    enuf = enuf+sum(enu{kk},3);
 end
 enuf=enuf/length(to_get);
     kx = kxtmp(1,:);

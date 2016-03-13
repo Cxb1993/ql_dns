@@ -10,7 +10,7 @@ data_dir = 'QL_DNS/Data/';
 run_dir = ['CompTest' '/'];
 % run_dir = 'YousefN500_S2L16/';
 
-MFdim=16; % Dimension in the mean fields
+MFdim=64; % Dimension in the mean fields
 LZ=1;
 numMF = 4; % number of mean fields
 num_Energy_AM = 4;
@@ -80,47 +80,47 @@ plot(time, energy(3:4,:))
 ginput
 
 
-% % Mean fields;
-% % tmp = fread(fid_MF , inf ,'double');
-% % sim_len = floor(length(tmp)/(MFdim*numMF));
-% % tmp=tmp(1:(sim_len*MFdim*numMF));
-% tmp = fread(fid_MF , MFdim*numMF*sim_len ,'double');
-% if length(tmp)~=MFdim*numMF*sim_len
-%     error('Number of MF elements does not match up');
-% end
-% tmp = reshape(tmp,[MFdim*numMF,sim_len]);
-% for ii=0:numMF-1
-%     MF{ii+1} = tmp(ii*MFdim+1:(ii+1)*MFdim,:);
-%     MFmax{ii+1} = max(abs(MF{ii+1}));
-%     MFmean{ii+1} = sqrt(sum(abs(MF{ii+1}).^2)/MFdim);
-% end
-% subplot(211);
-% htime = 10;tf=floor(length(time));
-% % plot(time(1:htime), log10(MFmean{2}(1:htime)),time(1:htime),
-% % log10(MFmean{1}(1:htime)),...
-% %     time(1:htime), log10(MFmean{3}(1:htime)),time(1:htime), log10(MFmean{4}(1:htime)))
-% % plot( linspace(0,2*pi,MFdim), MF{2}(:,end),linspace(0,2*pi,MFdim), MF{1}(:,end) )
-% % Remove repeated times - annoying but oh well
-% % tf = find(time>700);
-% normalts = [1; find(diff(time)>0)+1];
-% % normalts=normalts(1:tf);
-% time = time(normalts);time = time(htime:tf);
-% zp=0:LZ/MFdim:LZ-LZ/MFdim;
-% MFByplot= MF{2}(:,normalts);MFByplot=MFByplot(:,htime:tf);
-% MFBxplot= MF{1}(:,normalts);MFBxplot=MFBxplot(:,htime:tf);
-% % MFVyplot= MF{4}(:,normalts);MFVyplot=MFVyplot(:,htime:tf);
-% % MFVxplot= MF{3}(:,normalts);MFVxplot=MFVxplot(:,htime:tf);
-% 
-% la=@(f) f;% log10(abs(f));
-% imagesc(time, zp,la(MFBxplot))%,20,'Linestyle','none')
-% xlabel('t');ylabel('z');title('Ux')
-% colorbar;
-% % xlim([0 100])
-% subplot(212)
-% imagesc(time, zp,la(MFByplot))%,20,'Linestyle','none')
-% xlabel('t');ylabel('z');title('Uy')
-% colorbar;
+% Mean fields;
+% tmp = fread(fid_MF , inf ,'double');
+% sim_len = floor(length(tmp)/(MFdim*numMF));
+% tmp=tmp(1:(sim_len*MFdim*numMF));
+tmp = fread(fid_MF , MFdim*numMF*sim_len ,'double');
+if length(tmp)~=MFdim*numMF*sim_len
+    error('Number of MF elements does not match up');
+end
+tmp = reshape(tmp,[MFdim*numMF,sim_len]);
+for ii=0:numMF-1
+    MF{ii+1} = tmp(ii*MFdim+1:(ii+1)*MFdim,:);
+    MFmax{ii+1} = max(abs(MF{ii+1}));
+    MFmean{ii+1} = sqrt(sum(abs(MF{ii+1}).^2)/MFdim);
+end
+subplot(211);
+htime = 10;tf=floor(length(time));
+% plot(time(1:htime), log10(MFmean{2}(1:htime)),time(1:htime),
+% log10(MFmean{1}(1:htime)),...
+%     time(1:htime), log10(MFmean{3}(1:htime)),time(1:htime), log10(MFmean{4}(1:htime)))
+% plot( linspace(0,2*pi,MFdim), MF{2}(:,end),linspace(0,2*pi,MFdim), MF{1}(:,end) )
+% Remove repeated times - annoying but oh well
+% tf = find(time>700);
+normalts = [1; find(diff(time)>0)+1];
+% normalts=normalts(1:tf);
+time = time(normalts);time = time(htime:tf);
+zp=0:LZ/MFdim:LZ-LZ/MFdim;
+MFByplot= MF{2}(:,normalts);MFByplot=MFByplot(:,htime:tf);
+MFBxplot= MF{1}(:,normalts);MFBxplot=MFBxplot(:,htime:tf);
+% MFVyplot= MF{4}(:,normalts);MFVyplot=MFVyplot(:,htime:tf);
+% MFVxplot= MF{3}(:,normalts);MFVxplot=MFVxplot(:,htime:tf);
+
+la=@(f) f;% log10(abs(f));
+imagesc(time, zp,la(MFBxplot))%,20,'Linestyle','none')
+xlabel('t');ylabel('z');title('Ux')
+colorbar;
 % xlim([0 100])
+subplot(212)
+imagesc(time, zp,la(MFByplot))%,20,'Linestyle','none')
+xlabel('t');ylabel('z');title('Uy')
+colorbar;
+xlim([0 100])
 % 
 % 
 % 

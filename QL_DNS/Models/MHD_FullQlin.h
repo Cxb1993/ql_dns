@@ -26,7 +26,7 @@ public:
     
     // Equations
     void rhs(const double t, const double dt_lin,
-             const solution * SolIn, solution * SolOut, doubVec **linOpFluct);
+              solution * SolIn, solution * SolOut, doubVec **linOpFluct);
     
     // Linear operator initialization
     void linearOPs_Init(double t0, doubVec **linOpFluct, doubVec *linOpMF);
@@ -70,6 +70,7 @@ private:
     const int numMF_, numLin_;
     // Physical parameters - don't set as const
     double nu_, eta_; // dissipation
+    const int viscosity_order_; // Order of the Laplacian operator for dissipation
     double f_noise_; // Driving noise
     const double q_; // q
     // Mean magnetic field

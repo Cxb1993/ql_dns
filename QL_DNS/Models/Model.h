@@ -44,7 +44,7 @@ public:
     //  as to allow for semi-implicit integrators.
     // The linear operators are evaluated at t + dt_lin
     virtual void rhs(const double t, const double dt_lin,
-                    const solution * SolIn,solution * SolOut, doubVec **linOpFluct) = 0;
+                    solution * SolIn,solution * SolOut, doubVec **linOpFluct) = 0;
     
     // Initialization of linear operators - for mean fields linop is constant anyway
     virtual void linearOPs_Init(double t0, doubVec **linOpFluct, doubVec *linOpMF) = 0;

@@ -54,28 +54,27 @@ void solution::Initial_Conditions(Inputs &SP,fftwPlans &fft, Model *eqs, MPIdata
             linear_field_[i][j].setConstant(0.0);         
         }
     }
-    
-    linear_field_[3][7](0)=0.1;
+//    if (mpi->my_n_v()==0) linear_field_[0][1](1)=0.1;
 //    linear_field_[0][0](nz_)=0.1;
-    //  Random Initial conditions in the linear fields - use the DrivingNoise routines
-//    double init_k_range[2] = {0, 100.};
-//    double init_amp = 0.0; // Standard deviation of the initial conditions
-//    // Reset model to produce driving noise like this
-//    eqs->ChangeNoiseRange(1.0, init_k_range[0], init_k_range[1]);
-//    // Add on noise to solution (which is zero)
-//    eqs->DrivingNoise(0.0, 1.0, this);
-//    double multfac = init_amp; // This has some factor in it, but figure out later based on energy. Usually want init_amp ~ 100
-//    if ( std::isfinite(multfac) ){
-//        for (int i=0; i<nxy_; ++i) {
-//            for (int j=0; j<nLin_; ++j) {
-//                linear_field_[i][j] *= multfac;
-//            }
-//        }
-//    } else {
-//        mpi->print1("Warning: Found NaN or Inf in initial conditions! Starting from zero instead");
-//    }
-//    // Reset the k range
-//    eqs->ChangeNoiseRange(SP.f_noise, SP.noise_range_low, SP.noise_range_high);
+//      Random Initial conditions in the linear fields - use the DrivingNoise routines
+    double init_k_range[2] = {0, 100.};
+    double init_amp = 0.01; // Standard deviation of the initial conditions
+    // Reset model to produce driving noise like this
+    eqs->ChangeNoiseRange(1.0, init_k_range[0], init_k_range[1]);
+    // Add on noise to solution (which is zero)
+    eqs->DrivingNoise(0.0, 1.0, this);
+    double multfac = init_amp; // This has some factor in it, but figure out later based on energy. Usually want init_amp ~ 100
+    if ( std::isfinite(multfac) ){
+        for (int i=0; i<nxy_; ++i) {
+            for (int j=0; j<nLin_; ++j) {
+                linear_field_[i][j] *= multfac;
+            }
+        }
+    } else {
+        mpi->print1("Warning: Found NaN or Inf in initial conditions! Starting from zero instead");
+    }
+    // Reset the k range
+    eqs->ChangeNoiseRange(SP.f_noise, SP.noise_range_low, SP.noise_range_high);
     //
     //////////////////////////////////////////
     
@@ -83,6 +82,22 @@ void solution::Initial_Conditions(Inputs &SP,fftwPlans &fft, Model *eqs, MPIdata
     ////////////////////////////////////
     //   MEAN FIELDS
     // Assign to mean fields
+    
+    //////////////////////////
+    //  Square field/triangular velocity profiles for compressibility
+//    double d4square = 3.; // d should depend on pressure to B and V ratio
+//    if (eqs->num_Lin() == 4){
+//        d4square = 0.01; // Revert to sine wave if incompressible
+//    }
+//    std::stringstream prnt;
+//    prnt << "Warning: Initializing with non-sinusoidal profile with d = " << d4square<<"\n";
+//    mpi->print1(prnt.str());
+//    double dPonMF = 0.;
+//    std::stringstream prnt;
+//    prnt << "Reducing Ux and By by a factor ~ " << dPonMF<<" to account for DP0 \n";
+//    mpi->print1(prnt.str());
+    
+    
     dcmplxVec *meanf_r = new dcmplxVec[nMF_]; // Real space version
     for (int i=0; i<nMF_; ++i) {
         meanf_r[i] = dcmplxVec(nz_full_);
@@ -112,6 +127,9 @@ void solution::Initial_Conditions(Inputs &SP,fftwPlans &fft, Model *eqs, MPIdata
 //            
 //        }
         mult_fac= SP.initial_By;
+        //tanh(d4square*cos( MODE*zg(k) ))/tanh(d4square);
+        //sinh(d4square*sin( MODE*zg(k) ))/sinh(d4square);
+        //*sqrt(1+dPonMF)
         for (int i=0; i<nMF_; ++i) {
             for (int k=0; k<nz_full_; ++k) {
                 if (i==0) meanf_r[i](k) = (dcmplx) -mult_fac*cos( MODE*zg(k) );//Bx

@@ -52,6 +52,8 @@ public:
     double rho0;
     double P0;
     double deltaP0; // Background anisotropy Pp-Pl
+    double nueff;
+    double kL; // Heat flux kL - set to zero to turn off heat flux
     // Dissipation
     double nu;   // Viscosity
     double eta;   // Resisitivity - could ignore for hydrodynamic

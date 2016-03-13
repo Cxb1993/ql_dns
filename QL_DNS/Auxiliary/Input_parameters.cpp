@@ -96,6 +96,11 @@ Inputs::Inputs(const MPIdata& mpi, const std::string& input_file_name): mpi_node
         rho0 = Read_From_Input_File_<double>("rho0_", fullfile, 1.0);
         P0 = Read_From_Input_File_<double>("P0_", fullfile, 1.0);
         deltaP0 = Read_From_Input_File_<double>("deltaP0_", fullfile, 1.0);
+        // Collisionality for anisotropic pressures
+        nueff = Read_From_Input_File_<double>("nueff_", fullfile, 0.0);
+        // kL to use for heat flux model -- set to zero for no heat flux
+        kL = Read_From_Input_File_<double>("kL_", fullfile, 0.0);
+
 
         
         // Noise

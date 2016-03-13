@@ -27,7 +27,7 @@ public:
     
     // Equations
     void rhs(const double t, const double dt_lin,
-             const solution * SolIn, solution * SolOut, doubVec **linOpFluct);
+              solution * SolIn, solution * SolOut, doubVec **linOpFluct);
     
     // Linear operator initialization
     void linearOPs_Init(double t0, doubVec **linOpFluct, doubVec *linOpMF);
@@ -92,6 +92,7 @@ private:
     bool turn_off_fluct_Lorentz_force_;
     int L_mult_;
     int num_reynolds_saves_;
+    bool apply_b_divergence_cleaning_;
 
     
     // fft
@@ -137,7 +138,6 @@ private:
     dcmplxVec rho_, divu_;
     dcmplxVec tmp1_k_,tmp2_k_,tmp3_k_,tmp4_k_; // Temps before transform (size NZ() )
     dcmplxVec tmp1_z_;
-    dcmplxVec b_x_,b_y_,b_z_; // bx, by and bz, needed to clean divergence
     
     dcmplx kxctmp_, kyctmp_;
     double kxtmp_,kytmp_;

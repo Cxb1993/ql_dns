@@ -16,6 +16,7 @@ q_(sp.q),Omega_(sp.omega), // Rotation
 B0z_(sp.B0z), // Mean vertical field
 nu_(sp.nu), eta_(sp.eta),
 f_noise_(sp.f_noise),QL_YN_(sp.QuasiLinearQ),
+viscosity_order_(sp.viscosity_order),
 dont_drive_ky0_modes_(0),// If true, no driving ky=0 modes
 drive_only_velocity_fluctuations_(sp.drive_only_velocityQ), // If true, no magnetic forcing
 drive_only_magnetic_fluctuations_(sp.drive_only_magneticQ), // If true, no velocity forcing
@@ -108,6 +109,10 @@ fft_(fft) // FFT data
     if (turn_off_fluct_Lorentz_force_)
         mpi_.print1("No Lorentz force in fluctuating momentum equation!!!\n");
     L_mult_ = !turn_off_fluct_Lorentz_force_;
+    // Viscosity at kmax, useful for hyperviscosities
+    prnt.str("");
+    prnt << "nu*k^n ~ 1 at k = " << pow(1./nu_,1.0/viscosity_order_) << " (" << pow(1./nu_,1./viscosity_order_)/kmax << "*kmax): nu*kmax^n = " << nu_*pow(kmax,viscosity_order_) << std::endl;
+    mpi_.print1(prnt.str());
 
     
     ////////////////////////////////////////////////////
@@ -162,8 +167,9 @@ MHD_FullQlin::~MHD_FullQlin(){
     delete[] b_;
 }
 
+// Modified const of SolIn so that it can be divergence cleaned!
 void MHD_FullQlin::rhs(const double t, const double dt_lin,
-                          const solution * SolIn, solution * SolOut,doubVec **linOpFluct) {
+                           solution * SolIn, solution * SolOut,doubVec **linOpFluct) {
     // Calculate mean fields in real space
     // Calculate MFs in real space     By_ = MFin[1].matrix()*fft1Dfac_; // fft back doesn't include normalization
     // (NB could be optimized slightly by including memory copy in multiplication)
@@ -363,9 +369,10 @@ void MHD_FullQlin::rhs(const double t, const double dt_lin,
         //////   LINEAR PART
         // Need to re-evaluate laplacian, since different time.
         kxtmp_=kxtmp_ + q_*dt_lin*kytmp_;
-        linOpFluct[i][0] = nu_*((-kxtmp_*kxtmp_-kytmp_*kytmp_)+ K->kz2);
+        lapFtmp_= -((-kxtmp_*kxtmp_-kytmp_*kytmp_)+ K->kz2).abs().pow(viscosity_order_/2);
+        linOpFluct[i][0] = nu_*lapFtmp_;
         linOpFluct[i][1] = linOpFluct[i][0];
-        linOpFluct[i][2]  = (eta_/nu_)*linOpFluct[i][0];// Saves some calculation
+        linOpFluct[i][2] = eta_*lapFtmp_;
         linOpFluct[i][3] = linOpFluct[i][2];
         
         ////////////////////////////////////////
@@ -424,10 +431,13 @@ void MHD_FullQlin::linearOPs_Init(double t0, doubVec **linOpFluct, doubVec *linO
     // Fluctuations
     for (int i=0; i<Dimxy(); ++i) {
         assign_laplacians_(i, t0, 0); // Assign kx, lapF etc.
+        // Use lapFtmp_ to store Laplacian^Viscosity_order/2
+        lapFtmp_= -lapFtmp_.abs().pow(viscosity_order_/2);
         linOpFluct[i][0] = nu_*lapFtmp_;
         linOpFluct[i][1] = linOpFluct[i][0];
-        linOpFluct[i][2]  = (eta_/nu_)*linOpFluct[i][0];// Saves some calculation
+        linOpFluct[i][2] = eta_*lapFtmp_;
         linOpFluct[i][3] = linOpFluct[i][2];
+        
     }
     // Mean fields
     if (QL_YN_) {
